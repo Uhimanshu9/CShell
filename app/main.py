@@ -2,11 +2,12 @@ import sys
 
 
 def main():
-    sys.stdout.write("$ ")
-    # print("$ ", end="")
-    user_command = input()
-    print(f"{user_command}: command not found")
-    #sys.stdin.readline().rstrip()
+    
+    while True:
+        sys.stdout.write("$ ")
+        sys.stdout.flush()
+        user_command = sys.stdin.readline().rstrip()
+        sys.stdout.write(f"{user_command}: command not found\n")
 
 
 
