@@ -7,6 +7,9 @@ def main():
         sys.stdout.write("$ ")
         sys.stdout.flush()
         user_command = sys.stdin.readline().rstrip()
+
+        if user_command =="exit":
+            break
         sys.stdout.write(f"{user_command}: command not found\n")
 
 
