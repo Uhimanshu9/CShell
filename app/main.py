@@ -18,9 +18,6 @@ def main():
         if command == "echo":
             sys.stdout.write(f"{' '.join(user_instruction[1:])}\n")
         
-
-        if user_command.startswith("echo "):
-            sys.stdout.write(f"{user_command[5:]}\n")
         else:
             sys.stdout.write(f"{user_command}: command not found\n")
 
