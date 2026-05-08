@@ -1,36 +1,56 @@
 import sys
 
 
+def handle_exit(args):
+    sys.exit(0)
+
+
+def handle_echo(args):
+    print(" ".join(args))
+
+
+def handle_type(args):
+
+    if not args:
+        print("type: missing argument")
+        return
+
+    command_name = args[0]
+
+    if command_name in commands:
+        print(f"{command_name} is a shell builtin")
+    else:
+        print(f"{command_name}: not found")
+
+
+commands = {
+    "exit": handle_exit,
+    "echo": handle_echo,
+    "type": handle_type,
+}
+
+
 def main():
 
-    buildin_commands = ["echo" , "exit" , "type"]
-    
     while True:
+
         sys.stdout.write("$ ")
         sys.stdout.flush()
+
         user_command = sys.stdin.readline().rstrip()
 
-        if user_command =="exit":
-            break
+        if not user_command:
+            continue
 
+        parts = user_command.split()
 
-        user_instruction = user_command.split()
+        command = parts[0]
+        args = parts[1:]
 
-        command  = user_instruction[0]
-
-        if command == "echo":
-            sys.stdout.write(f"{' '.join(user_instruction[1:])}\n")
-        
-        elif command == "type":
-            if len(user_instruction) < 2:
-                sys.stdout.write(f"{' '.join(user_instruction[1:])}: not found\n")
-            elif user_instruction[1] in buildin_commands:
-                sys.stdout.write(f"{user_instruction[1]} is a shell builtin\n")
-            else:
-                sys.stdout.write(f"{' '.join(user_instruction[1:])}: not found\n")
+        if command in commands:
+            commands[command](args)
         else:
-            sys.stdout.write(f"{user_command}: command not found\n")
-
+            print(f"{command}: command not found")
 
 
 if __name__ == "__main__":
