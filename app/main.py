@@ -23,11 +23,11 @@ def main():
         
         elif command == "type":
             if len(user_instruction) < 2:
-                sys.stdout.write(f"{' '.join(user_instruction[1:])}: command not found\n")
+                sys.stdout.write(f"{' '.join(user_instruction[1:])}: not found\n")
             elif user_instruction[1] in buildin_commands:
                 sys.stdout.write(f"{user_instruction[1]} is a shell builtin\n")
             else:
-                sys.stdout.write(f"{' '.join(user_instruction[1:])}: command not found\n")
+                sys.stdout.write(f"{' '.join(user_instruction[1:])}: not found\n")
         else:
             sys.stdout.write(f"{user_command}: command not found\n")
 
