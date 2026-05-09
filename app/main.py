@@ -11,9 +11,6 @@ def handle_echo(args):
     print(" ".join(args))
 
 
-import os
-
-
 def handle_type(args):
 
     # No command provided
@@ -49,6 +46,34 @@ def handle_type(args):
     # Step 4: Not found anywhere
     print(f"{command_name}: not found")
 
+
+
+def execute_external(command_name, command_args):
+
+    paths = os.environ["PATH"].split(":")
+
+    for path in paths:
+
+        full_path = os.path.join(path, command_name)
+
+        if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+
+            pid = os.fork()
+
+            # Child
+            if pid == 0:
+
+                os.execv(full_path, [command_name] + command_args)
+
+            # Parent
+            else:
+
+                os.wait()
+
+            return
+
+    print(f"{command_name}: command not found")
+
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
@@ -76,7 +101,8 @@ def main():
         if command in commands:
             commands[command](args)
         else:
-            print(f"{command}: command not found")
+            execute_external(command, args)
+            # print(f"{command}: command not found")
 
 
 if __name__ == "__main__":
