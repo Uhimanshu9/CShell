@@ -74,10 +74,14 @@ def execute_external(command_name, command_args):
 
     print(f"{command_name}: command not found")
 
+def handle_present_dir():
+    print(os.getcwd())
+
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
     "type": handle_type,
+    "pwd": handle_present_dir
 }
 
 
