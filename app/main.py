@@ -77,11 +77,34 @@ def execute_external(command_name, command_args):
 def handle_present_dir(args):
     print(os.getcwd())
 
+
+def handle_cd(args):
+    if not args:
+        print("cd: missing argument")
+        return
+    
+    path = args[0]
+
+    if path == '~':
+        path = os.path.expanduser("~")
+
+    # check if the directory exists
+    if os.path.isdir(path):
+        os.chdir(path)
+    else:
+        print(f"cd: {path}: No such file or directory")
+
+    
+
+
+
+
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
     "type": handle_type,
-    "pwd": handle_present_dir
+    "pwd": handle_present_dir,
+    "cd": handle_cd
 }
 
 
