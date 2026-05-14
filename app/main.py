@@ -1,15 +1,14 @@
 import sys
 import os
+import shlex
 
 path = os.environ["PATH"].split(":")
 
 def handle_exit(args):
     sys.exit(0)
 
-
 def handle_echo(args):
     print(" ".join(args))
-
 
 def handle_type(args):
 
@@ -46,8 +45,6 @@ def handle_type(args):
     # Step 4: Not found anywhere
     print(f"{command_name}: not found")
 
-
-
 def execute_external(command_name, command_args):
 
     paths = os.environ["PATH"].split(":")
@@ -76,7 +73,6 @@ def execute_external(command_name, command_args):
 
 def handle_present_dir(args):
     print(os.getcwd())
-
 
 def handle_cd(args):
     if not args:
@@ -120,7 +116,16 @@ def main():
         if not user_command:
             continue
 
-        parts = user_command.split()
+        
+        try:
+            parts = shlex.split(user_command)
+
+        except ValueError as e:
+            continuation = input("> ")
+            user_command += "\n" + continuation
+            parts = shlex.split(user_command)
+
+
 
         command = parts[0]
         args = parts[1:]
