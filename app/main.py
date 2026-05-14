@@ -113,29 +113,35 @@ def main():
 
         user_command = sys.stdin.readline().rstrip()
 
-        if not user_command:
+        while True:
+
+            try:
+
+                parts = shlex.split(user_command)
+                break
+
+            except ValueError:
+
+                sys.stdout.write("> ")
+                sys.stdout.flush()
+
+                continuation = sys.stdin.readline().rstrip()
+
+                user_command += "\n" + continuation
+
+        if not parts:
             continue
-
-        
-        try:
-            parts = shlex.split(user_command)
-
-        except ValueError as e:
-            continuation = input("> ")
-            user_command += "\n" + continuation
-            parts = shlex.split(user_command)
-
-
 
         command = parts[0]
         args = parts[1:]
 
         if command in commands:
-            commands[command](args)
-        else:
-            execute_external(command, args)
-            # print(f"{command}: command not found")
 
+            commands[command](args)
+
+        else:
+
+            execute_external(command, args)
 
 if __name__ == "__main__":
     main()
