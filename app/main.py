@@ -132,7 +132,9 @@ def main():
         if not parts:
             continue
 
-        if ">" in parts:
+        if "1>" in parts:
+            output_redirection_index = parts.index("1>")
+        elif ">" in parts:
             output_redirection_index = parts.index(">")
         else:
             output_redirection_index = None
