@@ -90,7 +90,7 @@ def handle_cd(args):
     else:
         print(f"cd: {path}: No such file or directory")
 
-    
+ 
 
 
 
@@ -132,8 +132,27 @@ def main():
         if not parts:
             continue
 
+        if ">" in parts:
+            output_redirection_index = parts.index(">")
+        else:
+            output_redirection_index = None
+
         command = parts[0]
-        args = parts[1:]
+        args = parts[1:] # this is a list
+
+
+        original_stdout = None
+        fd = None
+        if output_redirection_index is not None:
+            args = parts[1:output_redirection_index]
+            output_file = parts[output_redirection_index + 1] if output_redirection_index + 1 < len(parts) else None
+            fd = open(f'{output_file}', "w")
+            original_stdout = os.dup(1)  # Save original stdout
+            os.dup2(fd.fileno(), 1)  # Redirect stdout to the file
+
+        
+
+        # print(args)
 
         if command in commands:
 
@@ -142,6 +161,14 @@ def main():
         else:
 
             execute_external(command, args)
+
+        if output_redirection_index is not None:
+            os.dup2(original_stdout, 1)
+
+            os.close(original_stdout)
+
+            fd.close()
+            
 
 if __name__ == "__main__":
     main()
