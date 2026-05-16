@@ -104,7 +104,8 @@ REDIRECT_MAP = {
     ">": 1,  # stdout
     "2>": 2,  # stderr
     ">>": 1,  # stdout append
-    "2>>": 2   # stderr append
+    "2>>": 2,   # stderr append
+    "1>>": 1   # stdout append
 }
 
 def main():
