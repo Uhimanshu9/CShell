@@ -102,7 +102,8 @@ commands = {
 REDIRECT_MAP = {
     "1>": 1, # stdout
     ">": 1,  # stdout
-    "2>": 2  # stderr
+    "2>": 2,  # stderr
+    ">>": 1  # stdout append
 }
 
 def main():
@@ -138,6 +139,7 @@ def main():
         output_redirection_index = None  
         original_redirect_fd = None
         original_redirect = None
+        operation = "w"  # default to write mode
         fd = None
 
         # if "1>" in parts:
@@ -151,6 +153,7 @@ def main():
             if part in REDIRECT_MAP:
                 output_redirection_index = i
                 original_redirect = REDIRECT_MAP[part]
+                operation = "a" if part == ">>" else "w"
                 break
             # i -> index
             # part -> value at that index (eg 1>, >, 2>)
@@ -170,7 +173,7 @@ def main():
         if output_redirection_index is not None:
             args = parts[1:output_redirection_index]
             output_file = parts[output_redirection_index + 1] if output_redirection_index + 1 < len(parts) else None
-            fd = open(f'{output_file}', "w")
+            fd = open(f'{output_file}', operation)
             original_redirect_fd = os.dup(original_redirect)  # Save original stdout # type: ignore
             os.dup2(fd.fileno(), original_redirect)  # Redirect stdout to the file # type: ignore
 
