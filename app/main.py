@@ -103,7 +103,8 @@ REDIRECT_MAP = {
     "1>": 1, # stdout
     ">": 1,  # stdout
     "2>": 2,  # stderr
-    ">>": 1  # stdout append
+    ">>": 1,  # stdout append
+    "2>>": 2   # stderr append
 }
 
 def main():
@@ -153,7 +154,7 @@ def main():
             if part in REDIRECT_MAP:
                 output_redirection_index = i
                 original_redirect = REDIRECT_MAP[part]
-                operation = "a" if part == ">>" else "w"
+                operation = "a" if part == ">>" or part == "2>>" or part == "1>>" else "w"
                 break
             # i -> index
             # part -> value at that index (eg 1>, >, 2>)
