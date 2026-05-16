@@ -90,10 +90,6 @@ def handle_cd(args):
     else:
         print(f"cd: {path}: No such file or directory")
 
- 
-
-
-
 
 commands = {
     "exit": handle_exit,
@@ -132,25 +128,41 @@ def main():
         if not parts:
             continue
 
+        # index of output redirection operator (1>, >, 2>)
+# --------------------------------------------------------------------------------------#
+        output_redirection_index = None  
+
         if "1>" in parts:
             output_redirection_index = parts.index("1>")
         elif ">" in parts:
             output_redirection_index = parts.index(">")
-        else:
-            output_redirection_index = None
+        elif "2>" in parts:
+            output_redirection_index = parts.index("2>")
+
+
+        # seprate command and args
+# --------------------------------------------------------------------------------------#
 
         command = parts[0]
         args = parts[1:] # this is a list
 
 
+        # handle output redirection if present
+# --------------------------------------------------------------------------------------#
+
+        # > or 1>
         original_stdout = None
         fd = None
         if output_redirection_index is not None:
             args = parts[1:output_redirection_index]
             output_file = parts[output_redirection_index + 1] if output_redirection_index + 1 < len(parts) else None
-            fd = open(f'{output_file}', "w")
-            original_stdout = os.dup(1)  # Save original stdout
-            os.dup2(fd.fileno(), 1)  # Redirect stdout to the file
+            # fd = open(f'{output_file}', "w")
+            # original_stdout = os.dup(1)  # Save original stdout
+            # os.dup2(fd.fileno(), 1)  # Redirect stdout to the file
+            fd  = open(f'{output_file}', "w")
+            orginal_stderr = os.dup(2)
+            os.dup2(fd.fileno(), 2) # type: ignore
+
 
         
 
@@ -165,11 +177,15 @@ def main():
             execute_external(command, args)
 
         if output_redirection_index is not None:
-            os.dup2(original_stdout, 1)
+            # os.dup2(original_stdout, 1) # type: ignore
 
-            os.close(original_stdout)
+            # os.close(original_stdout) # type: ignore
 
-            fd.close()
+            # fd.close() # type: ignore 
+
+            os.dup2(orginal_stderr, 2) # type: ignore
+            os.close(orginal_stderr) # type: ignore
+            fd.close() # type: ignore
             
 
 if __name__ == "__main__":
