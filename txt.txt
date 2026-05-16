@@ -1,1 +1,1 @@
-ls: gg: No such file or directory
+hi
