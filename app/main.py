@@ -154,7 +154,7 @@ def handle_completer(args):
             target = args[2]
             script = args[1]
             COMPLETION_SCRIPT_REGISTRY[target] = script
-            print(f"Registered completion script for {target}")
+            # print(f"Registered completion script for {target}")
         else:
                 raise ValueError("Invalid complete option")
     else:
