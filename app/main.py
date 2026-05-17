@@ -129,8 +129,6 @@ def main():
 
     readline.set_completer(completer)
 
-
-
     while True:
 
         # sys.stdout.write("$ ")
