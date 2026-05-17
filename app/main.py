@@ -1,6 +1,7 @@
 import sys
 import os
 import shlex
+import readline
 
 path = os.environ["PATH"].split(":")
 
@@ -108,14 +109,35 @@ REDIRECT_MAP = {
     "1>>": 1   # stdout append
 }
 
+
+def completer(text, state):
+
+    matches = [
+        cmd for cmd in commands
+        if cmd.startswith(text)
+    ]
+
+    if state < len(matches):
+        return matches[state]
+
+    return None
+
+
 def main():
+    # readline.parse_and_bind("tab: complete")
+    readline.parse_and_bind("bind ^I rl_complete")
+
+    readline.set_completer(completer)
+
+
 
     while True:
 
-        sys.stdout.write("$ ")
-        sys.stdout.flush()
+        # sys.stdout.write("$ ")
+        # sys.stdout.flush()
 
-        user_command = sys.stdin.readline().rstrip()
+        # user_command = sys.stdin.readline().rstrip()
+        user_command = input("$ ")
 
         while True:
 
