@@ -138,7 +138,17 @@ def handle_cd(args):
         print(f"cd: {path}: No such file or directory")
 
 def handle_completer(args):
-    pass
+    # Minimal implementation for the Codecrafters stage:
+    # `complete -p <name>` should print a "no completion specification" message.
+    if "-p" in args or "--path" in args:
+        target = args[-1] if args and not args[-1].startswith("-") else ""
+        if not target:
+            print("complete: missing argument")
+            return
+        print(f"complete: {target}: no completion specification")
+        return
+
+    print("complete: missing argument")
 
 commands = {
     "exit": handle_exit,
@@ -146,7 +156,8 @@ commands = {
     "type": handle_type,
     "pwd": handle_present_dir,
     "cd": handle_cd,
-    "complete":handle_completer
+    "complete": handle_completer,
+    "completer": handle_completer,
 }
 
 REDIRECT_MAP = {
