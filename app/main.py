@@ -4,6 +4,8 @@ import shlex
 import readline
 
 path = os.environ["PATH"].split(":")
+COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
+
 
 
 def get_path_executables() -> set[str]:
@@ -20,8 +22,8 @@ def get_path_executables() -> set[str]:
             continue
     return executables
 
-
 PATH_EXECUTABLES = get_path_executables()
+
 
 
 def get_filename_completions(text: str) -> list[str]:
@@ -138,17 +140,25 @@ def handle_cd(args):
         print(f"cd: {path}: No such file or directory")
 
 def handle_completer(args):
-    # Minimal implementation for the Codecrafters stage:
-    # `complete -p <name>` should print a "no completion specification" message.
     if "-p" in args or "--path" in args:
-        target = args[-1] if args and not args[-1].startswith("-") else ""
-        if not target:
-            print("complete: missing argument")
-            return
-        print(f"complete: {target}: no completion specification")
-        return
-
-    print("complete: missing argument")
+        if len(args) == 2:
+            target = args[1]
+            if target in COMPLETION_SCRIPT_REGISTRY:
+                print(f"complete -C '{COMPLETION_SCRIPT_REGISTRY[args[1]]}' {args[1]}")
+            else:
+                print(f"complete: {target}: no completion specification") 
+        else:
+                raise ValueError("Invalid complete option")
+    elif "-C" in args:
+        if len(args) == 3:
+            target = args[2]
+            script = args[1]
+            COMPLETION_SCRIPT_REGISTRY[target] = script
+            print(f"Registered completion script for {target}")
+        else:
+                raise ValueError("Invalid complete option")
+    else:
+        raise ValueError("Invalid complete option")
 
 commands = {
     "exit": handle_exit,
