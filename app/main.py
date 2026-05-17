@@ -111,21 +111,27 @@ REDIRECT_MAP = {
 
 
 def completer(text, state):
+    matches = [cmd for cmd in commands if cmd.startswith(text)]
 
-    matches = [
-        cmd for cmd in commands
-        if cmd.startswith(text)
-    ]
+    # Codecrafters expects a trailing space after completing the command name.
+    # Only add it when completing the first token.
+    try:
+        if readline.get_begidx() == 0:
+            matches = [m + " " for m in matches]
+    except Exception:
+        pass
 
     if state < len(matches):
         return matches[state]
-
     return None
 
 
 def main():
-    # readline.parse_and_bind("tab: complete")
-    readline.parse_and_bind("bind ^I rl_complete")
+    # macOS often uses libedit, Codecrafters runner typically uses GNU readline.
+    if readline.__doc__ and "libedit" in readline.__doc__:
+        readline.parse_and_bind("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
 
     readline.set_completer(completer)
 
