@@ -137,13 +137,16 @@ def handle_cd(args):
     else:
         print(f"cd: {path}: No such file or directory")
 
+def handle_completer(args):
+    pass
 
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
     "type": handle_type,
     "pwd": handle_present_dir,
-    "cd": handle_cd
+    "cd": handle_cd,
+    "complete":handle_completer
 }
 
 REDIRECT_MAP = {
