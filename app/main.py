@@ -113,6 +113,19 @@ REDIRECT_MAP = {
 def completer(text, state):
     matches = [cmd for cmd in commands if cmd.startswith(text)]
 
+    # If there are no valid completions, keep input unchanged and ring the bell.
+    # Readline calls completer(text, state) with state=0,1,2,... for a single completion attempt.
+    # Ring only on the first call (state==0).
+    try:
+        begidx = readline.get_begidx()
+    except Exception:
+        begidx = 0
+
+    if not matches and state == 0 and begidx == 0:
+        sys.stdout.write("\x07")
+        sys.stdout.flush()
+        return None
+
     # Codecrafters expects a trailing space after completing the command name.
     # Only add it when completing the first token.
     try:
