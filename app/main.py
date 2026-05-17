@@ -23,6 +23,34 @@ def get_path_executables() -> set[str]:
 
 PATH_EXECUTABLES = get_path_executables()
 
+
+def get_filename_completions(text: str) -> list[str]:
+    # Expand ~ for matching, but keep returned paths in expanded form too.
+    expanded = os.path.expanduser(text)
+    directory, prefix = os.path.split(expanded)
+    search_dir = directory if directory else "."
+
+    try:
+        entries = os.listdir(search_dir)
+    except (FileNotFoundError, NotADirectoryError, PermissionError):
+        return []
+
+    completions: list[str] = []
+    for entry in entries:
+        if not entry.startswith(prefix):
+            continue
+
+        candidate = os.path.join(directory, entry) if directory else entry
+        full_candidate = os.path.join(search_dir, entry)
+
+        # Directories usually continue with '/', files usually continue with a space.
+        if os.path.isdir(full_candidate):
+            completions.append(candidate + "/")
+        else:
+            completions.append(candidate + " ")
+
+    return sorted(completions)
+
 def handle_exit(args):
     sys.exit(0)
 
@@ -134,18 +162,19 @@ def completer(text, state):
     except Exception:
         begidx = 0
 
-    # Only autocomplete the first token (the command name).
+    # Complete the first token as a command (builtins + PATH executables),
+    # otherwise complete filenames.
     if begidx == 0:
         candidates = set(commands.keys()) | PATH_EXECUTABLES
+        matches = [cmd for cmd in sorted(candidates) if cmd.startswith(text)]
     else:
-        candidates = set()
-
-    matches = [cmd for cmd in sorted(candidates) if cmd.startswith(text)]
+        matches = get_filename_completions(text)
 
     # If there are no valid completions, keep input unchanged and ring the bell.
     # Readline calls completer(text, state) with state=0,1,2,... for a single completion attempt.
     # Ring only on the first call (state==0).
-    if not matches and state == 0 and begidx == 0:
+    # No completions: keep input unchanged, ring bell once.
+    if not matches and state == 0:
         sys.stdout.write("\x07")
         sys.stdout.flush()
         return None
@@ -168,6 +197,8 @@ def main():
         readline.parse_and_bind("tab: complete")
 
     readline.set_completer(completer)
+    # Treat only whitespace as a delimiter so path completion like ./src works.
+    readline.set_completer_delims(" \t\n")
 
     while True:
 
