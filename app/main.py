@@ -5,6 +5,24 @@ import readline
 
 path = os.environ["PATH"].split(":")
 
+
+def get_path_executables() -> set[str]:
+    executables: set[str] = set()
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not directory:
+            continue
+        try:
+            for name in os.listdir(directory):
+                full_path = os.path.join(directory, name)
+                if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+                    executables.add(name)
+        except (FileNotFoundError, PermissionError):
+            continue
+    return executables
+
+
+PATH_EXECUTABLES = get_path_executables()
+
 def handle_exit(args):
     sys.exit(0)
 
@@ -111,16 +129,22 @@ REDIRECT_MAP = {
 
 
 def completer(text, state):
-    matches = [cmd for cmd in commands if cmd.startswith(text)]
-
-    # If there are no valid completions, keep input unchanged and ring the bell.
-    # Readline calls completer(text, state) with state=0,1,2,... for a single completion attempt.
-    # Ring only on the first call (state==0).
     try:
         begidx = readline.get_begidx()
     except Exception:
         begidx = 0
 
+    # Only autocomplete the first token (the command name).
+    if begidx == 0:
+        candidates = set(commands.keys()) | PATH_EXECUTABLES
+    else:
+        candidates = set()
+
+    matches = [cmd for cmd in sorted(candidates) if cmd.startswith(text)]
+
+    # If there are no valid completions, keep input unchanged and ring the bell.
+    # Readline calls completer(text, state) with state=0,1,2,... for a single completion attempt.
+    # Ring only on the first call (state==0).
     if not matches and state == 0 and begidx == 0:
         sys.stdout.write("\x07")
         sys.stdout.flush()
@@ -128,11 +152,8 @@ def completer(text, state):
 
     # Codecrafters expects a trailing space after completing the command name.
     # Only add it when completing the first token.
-    try:
-        if readline.get_begidx() == 0:
-            matches = [m + " " for m in matches]
-    except Exception:
-        pass
+    if begidx == 0:
+        matches = [m + " " for m in matches]
 
     if state < len(matches):
         return matches[state]
