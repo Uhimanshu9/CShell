@@ -7,9 +7,10 @@ import subprocess
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
 
-# Tracks the last "ambiguous" completion request (multiple candidates) so we can
-# implement "TAB rings bell, TAB TAB shows list" behavior.
-LAST_AMBIGUOUS_COMPLETION_KEY: tuple[str, int, int, str] | None = None
+PROMPT = "$ "
+
+# Used to implement: first TAB rings bell, second TAB shows all candidates.
+LAST_AMBIGUOUS_TAB_KEY: tuple[str, int, int] | None = None
 
 
 
@@ -203,11 +204,11 @@ def completer(text, state):
     script_path = get_completer_script_for_command(command_name) if command_name else None
 
     # If the user edited the line since the last ambiguous completion, forget it.
-    global LAST_AMBIGUOUS_COMPLETION_KEY
-    if LAST_AMBIGUOUS_COMPLETION_KEY is not None and LAST_AMBIGUOUS_COMPLETION_KEY[0] != line_buffer:
-        LAST_AMBIGUOUS_COMPLETION_KEY = None
+    global LAST_AMBIGUOUS_TAB_KEY
+    if LAST_AMBIGUOUS_TAB_KEY is not None and LAST_AMBIGUOUS_TAB_KEY[0] != line_buffer:
+        LAST_AMBIGUOUS_TAB_KEY = None
 
-    if script_path and command_name:
+    if script_path and command_name and begidx != 0:
         # Passing arguments to the completer script:
         # argv[1] = command name
         # argv[2] = word being completed (readline passes this as `text`)
@@ -215,20 +216,17 @@ def completer(text, state):
         before_current = line_buffer[:begidx].rstrip()
         previous_word = before_current.split()[-1] if before_current.split() else ""
 
-        # Environment variables required by programmable completion.
+        # Completion environment variables.
         # COMP_LINE: full command line (no trailing newline)
-        # COMP_POINT: zero-based byte index of cursor position in COMP_LINE
+        # COMP_POINT: zero-based byte index of cursor position
         try:
-            cursor_char_index = readline.get_endidx()
+            endidx = readline.get_endidx()
         except Exception:
-            cursor_char_index = len(line_buffer)
-
-        comp_line = line_buffer
-        comp_point = len(comp_line[:cursor_char_index].encode("utf-8"))
+            endidx = len(line_buffer)
 
         env = os.environ.copy()
-        env["COMP_LINE"] = comp_line
-        env["COMP_POINT"] = str(comp_point)
+        env["COMP_LINE"] = line_buffer
+        env["COMP_POINT"] = str(len(line_buffer[:endidx].encode("utf-8")))
 
         try:
             result = subprocess.run(
@@ -248,27 +246,19 @@ def completer(text, state):
             matches = [candidate]
         elif len(candidates) > 1:
             # Multiple candidates:
-            # - first TAB: ring bell, leave input unchanged
-            # - second TAB: show candidates (sorted) and redraw prompt + input
-            global LAST_AMBIGUOUS_COMPLETION_KEY
-
-            try:
-                endidx = readline.get_endidx()
-            except Exception:
-                endidx = len(line_buffer)
-
-            key = (line_buffer, begidx, endidx, command_name)
+            # - First TAB: ring bell, do not autocomplete.
+            # - Second consecutive TAB: show all candidates and redraw prompt + input.
+            key = (line_buffer, begidx, endidx)
 
             if state == 0:
-                if LAST_AMBIGUOUS_COMPLETION_KEY == key:
-                    LAST_AMBIGUOUS_COMPLETION_KEY = None
+                if LAST_AMBIGUOUS_TAB_KEY == key:
+                    LAST_AMBIGUOUS_TAB_KEY = None
                     shown = "  ".join(sorted(candidates))
-                    sys.stdout.write("\n" + shown + "\n" + "$ " + line_buffer)
+                    sys.stdout.write("\n" + shown + "\n" + PROMPT + line_buffer)
                     sys.stdout.flush()
                 else:
-                    LAST_AMBIGUOUS_COMPLETION_KEY = key
-                    sys.stdout.write("\x07")
-                    sys.stdout.flush()
+                    LAST_AMBIGUOUS_TAB_KEY = key
+                    print("\a", end="", flush=True)
 
             return None
         else:
