@@ -7,6 +7,10 @@ import subprocess
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
 
+# Tracks the last "ambiguous" completion request (multiple candidates) so we can
+# implement "TAB rings bell, TAB TAB shows list" behavior.
+LAST_AMBIGUOUS_COMPLETION_KEY: tuple[str, int, int, str] | None = None
+
 
 
 def get_path_executables() -> set[str]:
@@ -198,6 +202,11 @@ def completer(text, state):
     command_name = stripped.split(maxsplit=1)[0] if stripped else ""
     script_path = get_completer_script_for_command(command_name) if command_name else None
 
+    # If the user edited the line since the last ambiguous completion, forget it.
+    global LAST_AMBIGUOUS_COMPLETION_KEY
+    if LAST_AMBIGUOUS_COMPLETION_KEY is not None and LAST_AMBIGUOUS_COMPLETION_KEY[0] != line_buffer:
+        LAST_AMBIGUOUS_COMPLETION_KEY = None
+
     if script_path and command_name:
         # Passing arguments to the completer script:
         # argv[1] = command name
@@ -228,16 +237,40 @@ def completer(text, state):
                 text=True,
                 env=env,
             )
-            candidates = [ln for ln in result.stdout.splitlines() if ln]
+            candidates = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
         except OSError:
             candidates = []
 
-        # For this stage we assume exactly one line is returned.
-        if candidates:
+        if len(candidates) == 1:
             candidate = candidates[0]
             if not candidate.endswith(" "):
                 candidate += " "
             matches = [candidate]
+        elif len(candidates) > 1:
+            # Multiple candidates:
+            # - first TAB: ring bell, leave input unchanged
+            # - second TAB: show candidates (sorted) and redraw prompt + input
+            global LAST_AMBIGUOUS_COMPLETION_KEY
+
+            try:
+                endidx = readline.get_endidx()
+            except Exception:
+                endidx = len(line_buffer)
+
+            key = (line_buffer, begidx, endidx, command_name)
+
+            if state == 0:
+                if LAST_AMBIGUOUS_COMPLETION_KEY == key:
+                    LAST_AMBIGUOUS_COMPLETION_KEY = None
+                    shown = "  ".join(sorted(candidates))
+                    sys.stdout.write("\n" + shown + "\n" + "$ " + line_buffer)
+                    sys.stdout.flush()
+                else:
+                    LAST_AMBIGUOUS_COMPLETION_KEY = key
+                    sys.stdout.write("\x07")
+                    sys.stdout.flush()
+
+            return None
         else:
             matches = []
     else:
