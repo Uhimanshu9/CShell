@@ -206,11 +206,27 @@ def completer(text, state):
         before_current = line_buffer[:begidx].rstrip()
         previous_word = before_current.split()[-1] if before_current.split() else ""
 
+        # Environment variables required by programmable completion.
+        # COMP_LINE: full command line (no trailing newline)
+        # COMP_POINT: zero-based byte index of cursor position in COMP_LINE
+        try:
+            cursor_char_index = readline.get_endidx()
+        except Exception:
+            cursor_char_index = len(line_buffer)
+
+        comp_line = line_buffer
+        comp_point = len(comp_line[:cursor_char_index].encode("utf-8"))
+
+        env = os.environ.copy()
+        env["COMP_LINE"] = comp_line
+        env["COMP_POINT"] = str(comp_point)
+
         try:
             result = subprocess.run(
                 [script_path, command_name, text, previous_word],
                 capture_output=True,
                 text=True,
+                env=env,
             )
             candidates = [ln for ln in result.stdout.splitlines() if ln]
         except OSError:
