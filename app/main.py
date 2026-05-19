@@ -198,9 +198,20 @@ def completer(text, state):
     command_name = stripped.split(maxsplit=1)[0] if stripped else ""
     script_path = get_completer_script_for_command(command_name) if command_name else None
 
-    if script_path and begidx != 0:
+    if script_path and command_name:
+        # Passing arguments to the completer script:
+        # argv[1] = command name
+        # argv[2] = word being completed (readline passes this as `text`)
+        # argv[3] = previous word (or empty string)
+        before_current = line_buffer[:begidx].rstrip()
+        previous_word = before_current.split()[-1] if before_current.split() else ""
+
         try:
-            result = subprocess.run([script_path], capture_output=True, text=True)
+            result = subprocess.run(
+                [script_path, command_name, text, previous_word],
+                capture_output=True,
+                text=True,
+            )
             candidates = [ln for ln in result.stdout.splitlines() if ln]
         except OSError:
             candidates = []
