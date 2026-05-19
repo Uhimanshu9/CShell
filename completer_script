@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+# Example completion script.
+# Your shell will call this script with COMP_LINE/COMP_POINT set.
+# It should print one completion per line.
+
+comp_line = os.environ.get("COMP_LINE", "")
+
+# Very small demo for `docker ...`
+# - `docker r<TAB>` -> run
+# - `docker b<TAB>` -> build
+# - `docker p<TAB>` -> push
+
+# Last "word" (simple split; good enough for demo)
+last = comp_line.split()[-1] if comp_line.split() else ""
+
+options = ["run", "build", "push", "ps", "pull"]
+for opt in options:
+    if opt.startswith(last):
+        sys.stdout.write(opt + "\n")

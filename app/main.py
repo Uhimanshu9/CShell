@@ -2,6 +2,7 @@ import sys
 import os
 import shlex
 import readline
+import subprocess
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
@@ -160,14 +161,18 @@ def handle_completer(args):
     else:
         raise ValueError("Invalid complete option")
 
+
+def get_completer_script_for_command(command: str) -> str | None:
+    return COMPLETION_SCRIPT_REGISTRY.get(command) 
+
+
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
     "type": handle_type,
     "pwd": handle_present_dir,
     "cd": handle_cd,
-    "complete": handle_completer,
-    "completer": handle_completer,
+    "complete": handle_completer
 }
 
 REDIRECT_MAP = {
@@ -186,13 +191,40 @@ def completer(text, state):
     except Exception:
         begidx = 0
 
-    # Complete the first token as a command (builtins + PATH executables),
-    # otherwise complete filenames.
-    if begidx == 0:
-        candidates = set(commands.keys()) | PATH_EXECUTABLES
-        matches = [cmd for cmd in sorted(candidates) if cmd.startswith(text)]
+    # Programmable completion: if the command has a registered script via
+    # `complete -C <script_path> <command>`, run it and use its stdout.
+    line_buffer = readline.get_line_buffer()
+    stripped = line_buffer.lstrip()
+    command_name = stripped.split(maxsplit=1)[0] if stripped else ""
+    script_path = get_completer_script_for_command(command_name) if command_name else None
+
+    if script_path and begidx != 0:
+        try:
+            result = subprocess.run([script_path], capture_output=True, text=True)
+            candidates = [ln for ln in result.stdout.splitlines() if ln]
+        except OSError:
+            candidates = []
+
+        # For this stage we assume exactly one line is returned.
+        if candidates:
+            candidate = candidates[0]
+            if not candidate.endswith(" "):
+                candidate += " "
+            matches = [candidate]
+        else:
+            matches = []
     else:
-        matches = get_filename_completions(text)
+        matches = []
+
+    # Fallback completion (when no programmable completer exists):
+    # - first token: builtins + PATH executables
+    # - other tokens: filenames
+    if not matches:
+        if begidx == 0:
+            fallback_candidates = set(commands.keys()) | PATH_EXECUTABLES
+            matches = [cmd for cmd in sorted(fallback_candidates) if cmd.startswith(text)]
+        else:
+            matches = get_filename_completions(text)
 
     # If there are no valid completions, keep input unchanged and ring the bell.
     # Readline calls completer(text, state) with state=0,1,2,... for a single completion attempt.
@@ -303,7 +335,7 @@ def main():
             commands[command](args)
 
         else:
-
+            
             execute_external(command, args)
 
         if output_redirection_index is not None:
