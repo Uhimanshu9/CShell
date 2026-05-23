@@ -155,6 +155,14 @@ def handle_completer(args):
                 print(f"complete: {target}: no completion specification") 
         else:
                 raise ValueError("Invalid complete option")
+    elif "-r" in args:
+        if len(args) == 2:
+            target = args[1]
+            # Remove any stored completion rule for this command.
+            # Produce no output on success.
+            COMPLETION_SCRIPT_REGISTRY.pop(target, None)
+        else:
+            raise ValueError("Invalid complete option")
     elif "-C" in args:
         if len(args) == 3:
             target = args[2]
