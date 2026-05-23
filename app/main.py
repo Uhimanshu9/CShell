@@ -4,7 +4,7 @@ import shlex
 import readline
 import subprocess
 
-from .jobs import handle_jobs
+from .jobs import handle_jobs, register_job
 
 
 
@@ -103,7 +103,7 @@ def handle_type(args):
     # Step 4: Not found anywhere
     print(f"{command_name}: not found")
 
-def execute_external(command_name, command_args):
+def execute_external(command_name, command_args, *, wait: bool = True) -> int | None:
 
     paths = os.environ["PATH"].split(":")
 
@@ -123,11 +123,13 @@ def execute_external(command_name, command_args):
             # Parent
             else:
 
-                os.wait()
+                if wait:
+                    os.waitpid(pid, 0)
 
-            return
+            return pid
 
     print(f"{command_name}: command not found")
+    return None
 
 def handle_present_dir(args):
     print(os.getcwd())
@@ -355,6 +357,12 @@ def main():
         if not parts:
             continue
 
+        is_background = parts[-1] == "&"
+        if is_background:
+            parts = parts[:-1]
+            if not parts:
+                continue
+
         # index of output redirection operator (1>, >, 2>)
 # --------------------------------------------------------------------------------------#
         output_redirection_index = None  
@@ -403,12 +411,20 @@ def main():
         # print(args)
 
         if command in commands:
-
-            commands[command](args)
-
+            if is_background:
+                pid = os.fork()
+                if pid == 0:
+                    commands[command](args)
+                    os._exit(0)
+                job_id = register_job(pid)
+                print(f"[{job_id}] {pid}")
+            else:
+                commands[command](args)
         else:
-            
-            execute_external(command, args)
+            pid = execute_external(command, args, wait=not is_background)
+            if is_background and pid is not None:
+                job_id = register_job(pid)
+                print(f"[{job_id}] {pid}")
 
         if output_redirection_index is not None:
      

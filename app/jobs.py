@@ -1,14 +1,12 @@
-import subprocess
+background_jobs: list[int] = []
 
 
+def register_job(pid: int) -> int:
+    background_jobs.append(pid)
+    return len(background_jobs)
 
-background_jobs = []
 
-
-def handle_jobs(args):
-    if len(args) > 1:
-        if args[-1] == "&":
-            process = subprocess.Popen(args[:-1])
-            background_jobs.append(process)
-
-            print(f"[{len(background_jobs)}] {process.pid}")
+def handle_jobs(_args: list[str]) -> None:
+    # Minimal implementation: just list known background PIDs.
+    for job_id, pid in enumerate(background_jobs, start=1):
+        print(f"[{job_id}] {pid}")
