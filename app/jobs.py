@@ -16,7 +16,14 @@ class Job:
 
 
 _jobs: list[Job] = []
-_next_job_id: int = 1
+
+
+def _allocate_job_id() -> int:
+    used = {job.job_id for job in _jobs}
+    job_id = 1
+    while job_id in used:
+        job_id += 1
+    return job_id
 
 
 def _is_pid_running(pid: int) -> bool:
@@ -53,11 +60,11 @@ def _job_status(job: Job) -> str:
     return "Done" if job.done else "Running"
 
 
-def _job_marker(job_ids: list[int], job_id: int) -> str:
-    if not job_ids:
+def _job_marker(job_id: int) -> str:
+    if not _jobs:
         return " "
-    most_recent = job_ids[-1]
-    previous = job_ids[-2] if len(job_ids) >= 2 else None
+    most_recent = _jobs[-1].job_id
+    previous = _jobs[-2].job_id if len(_jobs) >= 2 else None
     if job_id == most_recent:
         return "+"
     if previous is not None and job_id == previous:
@@ -65,32 +72,32 @@ def _job_marker(job_ids: list[int], job_id: int) -> str:
     return " "
 
 
-def _format_job_line(*, job: Job, status: str, marker: str) -> str:
-    # Codecrafters expects a fixed amount of spacing after the status word.
-    # - Running + 17 spaces
-    # - Done + 17 spaces
+def _format_job_line(job: Job, status: str) -> str:
+    status_width = 21
+    marker = _job_marker(job.job_id)
     command_str = f"{job.command} &" if status == "Running" else job.command
-    return f"[{job.job_id}]{marker}  {status}{' ' * 17}{command_str}"
+    return f"[{job.job_id}]{marker}  {status:<{status_width}}{command_str}"
 
 
 def register_job(*, pid: int, command: str, process: Popen | None = None) -> Job:
-    global _next_job_id
-
-    job = Job(job_id=_next_job_id, pid=pid, command=command, process=process)
-    _next_job_id += 1
+    job = Job(job_id=_allocate_job_id(), pid=pid, command=command, process=process)
     _jobs.append(job)
     return job
 
 
 def notify_done_jobs() -> None:
     """Print one-time 'Done' recap lines for jobs that finished since last prompt."""
-    job_ids = [job.job_id for job in _jobs]
-    for job in _jobs:
-        status = _job_status(job)
+    global _jobs
+
+    jobs_with_status: list[tuple[Job, str]] = [(job, _job_status(job)) for job in _jobs]
+
+    for job, status in jobs_with_status:
         if status == "Done" and not job.notified:
-            marker = _job_marker(job_ids, job.job_id)
-            print(_format_job_line(job=job, status=status, marker=marker))
+            print(_format_job_line(job, status))
             job.notified = True
+
+    # Remove completed jobs so their job IDs can be recycled.
+    _jobs = [job for job, status in jobs_with_status if status == "Running"]
 
 
 def handle_jobs(_args: list[str]) -> None:
@@ -109,18 +116,8 @@ def handle_jobs(_args: list[str]) -> None:
 
     jobs_with_status: list[tuple[Job, str]] = [(job, _job_status(job)) for job in _jobs]
 
-    # If a job was already announced as Done via the automatic recap, do not
-    # print it again in `jobs` output. Still reap/remove it below.
-    jobs_to_show: list[tuple[Job, str]] = [
-        (job, status)
-        for job, status in jobs_with_status
-        if not (status == "Done" and job.notified)
-    ]
-
-    visible_job_ids = [job.job_id for job, _status in jobs_to_show]
-    for job, status in jobs_to_show:
-        marker = _job_marker(visible_job_ids, job.job_id)
-        print(_format_job_line(job=job, status=status, marker=marker))
+    for job, status in jobs_with_status:
+        print(_format_job_line(job, status))
 
     # Remove completed jobs so they don't appear in subsequent `jobs` calls.
     _jobs = [job for job, status in jobs_with_status if status == "Running"]
