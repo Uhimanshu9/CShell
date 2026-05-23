@@ -4,7 +4,7 @@ import shlex
 import readline
 import subprocess
 
-from .jobs import handle_jobs, register_job
+from .jobs import handle_jobs, notify_done_jobs, register_job
 
 
 
@@ -317,6 +317,9 @@ def main():
 
         # sys.stdout.write("$ ")
         # sys.stdout.flush()
+
+        # Print automatic job completion recaps before the next prompt.
+        notify_done_jobs()
 
         # user_command = sys.stdin.readline().rstrip()
         try:
