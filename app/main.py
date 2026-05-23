@@ -246,6 +246,16 @@ def completer(text, state):
             matches = [candidate]
         elif len(candidates) > 1:
             # Multiple candidates:
+            # If they share a longer common prefix than what's currently typed,
+            # autocomplete up to that prefix (no bell, no listing).
+            lcp = os.path.commonprefix(candidates)
+            if len(lcp) > len(text):
+                LAST_AMBIGUOUS_TAB_KEY = None
+                if state == 0:
+                    return lcp
+                return None
+
+            # Multiple candidates:
             # - First TAB: ring bell, do not autocomplete.
             # - Second consecutive TAB: show all candidates and redraw prompt + input.
             key = (line_buffer, begidx, endidx)
