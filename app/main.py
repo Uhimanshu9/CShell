@@ -3,6 +3,7 @@ import os
 import shlex
 import readline
 import subprocess
+from jobs import handle_jobs
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
@@ -11,7 +12,6 @@ PROMPT = "$ "
 
 # Used to implement: first TAB rings bell, second TAB shows all candidates.
 LAST_AMBIGUOUS_TAB_KEY: tuple[str, int, int] | None = None
-
 
 
 def get_path_executables() -> set[str]:
@@ -185,7 +185,8 @@ commands = {
     "type": handle_type,
     "pwd": handle_present_dir,
     "cd": handle_cd,
-    "complete": handle_completer
+    "complete": handle_completer,
+    "jobs": handle_jobs
 }
 
 REDIRECT_MAP = {
