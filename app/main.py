@@ -344,7 +344,7 @@ def main():
             continue
 
         is_background = parts[-1] == "&"
-        display_command = " ".join(parts)
+        display_command = " ".join(parts[:-1]) if is_background else " ".join(parts)
         if is_background:
             parts = parts[:-1]
             if not parts:

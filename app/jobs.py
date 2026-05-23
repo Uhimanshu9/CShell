@@ -47,7 +47,7 @@ def handle_jobs(_args: list[str]) -> None:
     # - job number in brackets
     # - '+' for most recent job, '-' for previous, ' ' otherwise
     # - two spaces
-    # - status padded to 24 chars
+    # - status padded to a fixed width (Codecrafters expects exact spacing)
     # - command string
 
     global _jobs
@@ -60,13 +60,18 @@ def handle_jobs(_args: list[str]) -> None:
     most_recent = _jobs[-1].job_id
     previous = _jobs[-2].job_id if len(_jobs) >= 2 else None
 
+    status_width = 21
+
     for job, status in jobs_with_status:
         marker = " "
         if job.job_id == most_recent:
             marker = "+"
         elif previous is not None and job.job_id == previous:
             marker = "-"
-        print(f"[{job.job_id}] {marker}  {status:<24}{job.command}")
+
+        command_str = f"{job.command} &" if status == "Running" else job.command
+        # NOTE: Codecrafters expects no space between ']' and the marker.
+        print(f"[{job.job_id}]{marker}  {status:<{status_width}}{command_str}")
 
     # Remove completed jobs so they don't appear in subsequent `jobs` calls.
     _jobs = [job for job, status in jobs_with_status if status == "Running"]
