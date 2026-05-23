@@ -1,12 +1,67 @@
-background_jobs: list[int] = []
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from subprocess import Popen
 
 
-def register_job(pid: int) -> int:
-    background_jobs.append(pid)
-    return len(background_jobs)
+@dataclass
+class Job:
+    job_id: int
+    pid: int
+    command: str
+    process: Popen | None
+
+
+_jobs: list[Job] = []
+_next_job_id: int = 1
+
+
+def _is_pid_running(pid: int) -> bool:
+    try:
+        waited_pid, _status = os.waitpid(pid, os.WNOHANG)
+    except ChildProcessError:
+        # Either already reaped, or not our child.
+        return False
+    return waited_pid == 0
+
+
+def _job_status(job: Job) -> str:
+    if job.process is not None:
+        return "Running" if job.process.poll() is None else "Done"
+    return "Running" if _is_pid_running(job.pid) else "Done"
+
+
+def register_job(*, pid: int, command: str, process: Popen | None = None) -> Job:
+    global _next_job_id
+
+    job = Job(job_id=_next_job_id, pid=pid, command=command, process=process)
+    _next_job_id += 1
+    _jobs.append(job)
+    return job
 
 
 def handle_jobs(_args: list[str]) -> None:
-    # Minimal implementation: just list known background PIDs.
-    for job_id, pid in enumerate(background_jobs, start=1):
-        print(f"[{job_id}] {pid}")
+    # Output format (example):
+    # [1] +  Running                 sleep 10 &
+    # - job number in brackets
+    # - '+' for most recent job, '-' for previous, ' ' otherwise
+    # - two spaces
+    # - status padded to 24 chars
+    # - command string
+
+    if not _jobs:
+        return
+
+    most_recent = _jobs[-1].job_id
+    previous = _jobs[-2].job_id if len(_jobs) >= 2 else None
+
+    for job in _jobs:
+        marker = " "
+        if job.job_id == most_recent:
+            marker = "+"
+        elif previous is not None and job.job_id == previous:
+            marker = "-"
+
+        status = _job_status(job)
+        print(f"[{job.job_id}] {marker}  {status:<24}{job.command}")

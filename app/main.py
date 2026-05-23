@@ -103,33 +103,16 @@ def handle_type(args):
     # Step 4: Not found anywhere
     print(f"{command_name}: not found")
 
-def execute_external(command_name, command_args, *, wait: bool = True) -> int | None:
+def execute_external(command_name, command_args, *, wait: bool = True) -> subprocess.Popen | None:
+    try:
+        process = subprocess.Popen([command_name] + command_args)
+    except FileNotFoundError:
+        print(f"{command_name}: command not found")
+        return None
 
-    paths = os.environ["PATH"].split(":")
-
-    for path in paths:
-
-        full_path = os.path.join(path, command_name)
-
-        if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
-
-            pid = os.fork()
-
-            # Child
-            if pid == 0:
-
-                os.execv(full_path, [command_name] + command_args)
-
-            # Parent
-            else:
-
-                if wait:
-                    os.waitpid(pid, 0)
-
-            return pid
-
-    print(f"{command_name}: command not found")
-    return None
+    if wait:
+        process.wait()
+    return process
 
 def handle_present_dir(args):
     print(os.getcwd())
@@ -336,7 +319,10 @@ def main():
         # sys.stdout.flush()
 
         # user_command = sys.stdin.readline().rstrip()
-        user_command = input("$ ")
+        try:
+            user_command = input("$ ")
+        except EOFError:
+            return
 
         while True:
 
@@ -358,6 +344,7 @@ def main():
             continue
 
         is_background = parts[-1] == "&"
+        display_command = " ".join(parts)
         if is_background:
             parts = parts[:-1]
             if not parts:
@@ -416,15 +403,15 @@ def main():
                 if pid == 0:
                     commands[command](args)
                     os._exit(0)
-                job_id = register_job(pid)
-                print(f"[{job_id}] {pid}")
+                job = register_job(pid=pid, command=display_command, process=None)
+                print(f"[{job.job_id}] {pid}")
             else:
                 commands[command](args)
         else:
-            pid = execute_external(command, args, wait=not is_background)
-            if is_background and pid is not None:
-                job_id = register_job(pid)
-                print(f"[{job_id}] {pid}")
+            process = execute_external(command, args, wait=not is_background)
+            if is_background and process is not None:
+                job = register_job(pid=process.pid, command=display_command, process=process)
+                print(f"[{job.job_id}] {process.pid}")
 
         if output_redirection_index is not None:
      
