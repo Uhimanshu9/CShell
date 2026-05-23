@@ -3,7 +3,10 @@ import os
 import shlex
 import readline
 import subprocess
-from jobs import handle_jobs
+
+from .jobs import handle_jobs
+
+
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
