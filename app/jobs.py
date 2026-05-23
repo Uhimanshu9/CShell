@@ -50,18 +50,23 @@ def handle_jobs(_args: list[str]) -> None:
     # - status padded to 24 chars
     # - command string
 
+    global _jobs
+
     if not _jobs:
         return
+
+    jobs_with_status: list[tuple[Job, str]] = [(job, _job_status(job)) for job in _jobs]
 
     most_recent = _jobs[-1].job_id
     previous = _jobs[-2].job_id if len(_jobs) >= 2 else None
 
-    for job in _jobs:
+    for job, status in jobs_with_status:
         marker = " "
         if job.job_id == most_recent:
             marker = "+"
         elif previous is not None and job.job_id == previous:
             marker = "-"
-
-        status = _job_status(job)
         print(f"[{job.job_id}] {marker}  {status:<24}{job.command}")
+
+    # Remove completed jobs so they don't appear in subsequent `jobs` calls.
+    _jobs = [job for job, status in jobs_with_status if status == "Running"]
