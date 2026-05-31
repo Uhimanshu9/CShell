@@ -192,6 +192,29 @@ def handle_completer(args):
 def get_completer_script_for_command(command: str) -> str | None:
     return COMPLETION_SCRIPT_REGISTRY.get(command) 
 
+def is_valid_identifier(name: str) -> bool:
+    """Check if a name is a valid shell variable identifier.
+    
+    Rules:
+    - Must start with a letter or underscore
+    - Can contain letters, digits, and underscores
+    - Cannot be empty
+    """
+    if not name:
+        return False
+    
+    # First character must be letter or underscore
+    if not (name[0].isalpha() or name[0] == "_"):
+        return False
+    
+    # Rest can be letters, digits, or underscores
+    for char in name[1:]:
+        if not (char.isalnum() or char == "_"):
+            return False
+    
+    return True
+
+
 def handle_declare(args):
     """Handle the declare builtin command.
     
@@ -224,6 +247,12 @@ def handle_declare(args):
         # Check if it contains an equals sign
         if "=" in assignment:
             var_name, var_value = assignment.split("=", 1)
+            
+            # Validate variable name
+            if not is_valid_identifier(var_name):
+                print(f"declare: `{assignment}': not a valid identifier")
+                return
+            
             SHELL_VARIABLES[var_name] = var_value
         else:
             # If no equals sign, treat as a flag or error
