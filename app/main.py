@@ -5,7 +5,7 @@ import readline
 import subprocess
 
 from .jobs import handle_jobs, notify_done_jobs, register_job
-from .pipeline import execute_pipeline
+from .pipeline import execute_pipeline, execute_multi_stage_pipeline, parse_pipeline
 
 
 
@@ -373,16 +373,20 @@ def main():
         # Check for pipeline (|) - handle before redirection
         # --------------------------------------------------------------------------------------#
         if "|" in parts:
-            pipe_index = parts.index("|")
-            left_cmd = parts[:pipe_index]
-            right_cmd = parts[pipe_index + 1:]
+            # Try to parse as a multi-stage pipeline (2+ commands)
+            stages = parse_pipeline(parts)
             
-            if not left_cmd or not right_cmd:
+            if stages:
+                if len(stages) == 2:
+                    # Two-stage pipeline: use optimized two-stage function
+                    execute_pipeline(stages[0], stages[1], commands)
+                else:
+                    # Multi-stage pipeline (3+ commands): use general function
+                    execute_multi_stage_pipeline(stages, commands)
+            else:
+                # Invalid pipeline syntax
                 print("Invalid pipeline syntax")
-                continue
             
-            # Execute pipeline with support for both built-in and external commands
-            execute_pipeline(left_cmd, right_cmd, commands)
             continue
 
         # index of output redirection operator (1>, >, 2>)
