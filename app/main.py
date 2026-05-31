@@ -65,6 +65,12 @@ def get_filename_completions(text: str) -> list[str]:
     return sorted(completions)
 
 def handle_exit(args):
+    # Save readline history before exiting
+    try:
+        history_file = os.path.expanduser("~/.shell_history")
+        readline.write_history_file(history_file)
+    except Exception:
+        pass
     sys.exit(0)
 
 def handle_echo(args):
@@ -191,18 +197,33 @@ def handle_history(args):
                 print("history: invalid argument")
                 return
         
-        # Display history from our manual tracking list
-        # History is 1-indexed for display
-        history_length = len(COMMAND_HISTORY)
-        start_index = 0
+        # Get history from readline
+        history_length = readline.get_history_length()
+        
+        # If history_length is 0 or -1, fall back to manual history list
+        if history_length <= 0 and COMMAND_HISTORY:
+            history_length = len(COMMAND_HISTORY)
+            start_index = 0
+            
+            if num_to_display is not None:
+                start_index = max(0, history_length - num_to_display)
+            
+            for i in range(start_index, history_length):
+                line_number = i + 1
+                print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
+            return
+        
+        # Display history from readline
+        start_index = 1  # readline history is 1-indexed
         
         if num_to_display is not None:
             # Show only the last N items
-            start_index = max(0, history_length - num_to_display)
+            start_index = max(1, history_length - num_to_display + 1)
         
-        for i in range(start_index, history_length):
-            line_number = i + 1  # 1-indexed line number
-            print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
+        for i in range(start_index, history_length + 1):
+            history_item = readline.get_history_item(i)
+            if history_item:
+                print(f"{i:5}  {history_item}")
     except BrokenPipeError:
         # Right side of pipeline closed early
         os._exit(0)
@@ -349,6 +370,17 @@ def completer(text, state):
 
 
 def main():
+    # Setup readline history file for persistence and arrow key recall
+    history_file = os.path.expanduser("~/.shell_history")
+    
+    # Try to load history from file
+    try:
+        readline.read_history_file(history_file)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    
     # macOS often uses libedit, Codecrafters runner typically uses GNU readline.
     if readline.__doc__ and "libedit" in readline.__doc__:
         readline.parse_and_bind("bind ^I rl_complete")
@@ -358,6 +390,9 @@ def main():
     readline.set_completer(completer)
     # Treat only whitespace as a delimiter so path completion like ./src works.
     readline.set_completer_delims(" \t\n")
+    
+    # Set history length to a reasonable value (default is 300)
+    readline.set_history_length(1000)
 
     while True:
 
