@@ -195,9 +195,14 @@ def handle_history(args):
     try:
         # Check for -r flag (read history file)
         if args and args[0] == "-r":
-            if os.path.exists(HISTORY_FILE):
+            # Determine which file to read from
+            history_file_to_read = HISTORY_FILE  # default
+            if len(args) > 1:
+                history_file_to_read = args[1]  # use the provided path
+            
+            if os.path.exists(history_file_to_read):
                 try:
-                    with open(HISTORY_FILE, 'r') as f:
+                    with open(history_file_to_read, 'r') as f:
                         for line in f:
                             line = line.rstrip('\n\r')
                             if line and line not in COMMAND_HISTORY:
