@@ -6,16 +6,17 @@ import subprocess
 
 from .jobs import handle_jobs, notify_done_jobs, register_job
 from .pipeline import execute_pipeline, execute_multi_stage_pipeline, parse_pipeline
-
+from .history import (
+    COMMAND_HISTORY,
+    HISTORY_FILE,
+    handle_history,
+    load_history_file,
+    save_history_file,
+)
 
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
-COMMAND_HISTORY: list[str] = []  # Manual history tracking
-COMMAND_HISTORY_SYNCED: int = 0  # How many commands have been written to file
-
-# History file path - respects HISTFILE environment variable
-HISTORY_FILE: str = os.path.expanduser(os.environ.get("HISTFILE", "~/.shell_history"))
 
 PROMPT = "$ "
 
@@ -69,16 +70,8 @@ def get_filename_completions(text: str) -> list[str]:
     return sorted(completions)
 
 def handle_exit(args):
-    global COMMAND_HISTORY_SYNCED
-    # Save readline history before exiting
-    try:
-        # Save both readline history and COMMAND_HISTORY to file
-        with open(HISTORY_FILE, 'w') as f:
-            for cmd in COMMAND_HISTORY:
-                f.write(cmd + '\n')
-        COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
-    except Exception:
-        pass
+    # Save history before exiting
+    save_history_file()
     sys.exit(0)
 
 def handle_echo(args):
@@ -194,90 +187,12 @@ def handle_completer(args):
         # Right side of pipeline closed early
         os._exit(0)
 
-def handle_history(args):
-    global COMMAND_HISTORY_SYNCED
-    try:
-        # Check for -r flag (read history file)
-        if args and args[0] == "-r":
-            # Determine which file to read from
-            history_file_to_read = HISTORY_FILE  # default
-            if len(args) > 1:
-                history_file_to_read = args[1]  # use the provided path
-            
-            if os.path.exists(history_file_to_read):
-                try:
-                    with open(history_file_to_read, 'r') as f:
-                        for line in f:
-                            line = line.rstrip('\n\r')
-                            if line and line not in COMMAND_HISTORY:
-                                COMMAND_HISTORY.append(line)
-                except Exception:
-                    pass
-            return
-        
-        # Check for -w flag (write history file)
-        if args and args[0] == "-w":
-            # Determine which file to write to
-            history_file_to_write = HISTORY_FILE  # default
-            if len(args) > 1:
-                history_file_to_write = args[1]  # use the provided path
-            
-            try:
-                with open(history_file_to_write, 'w') as f:
-                    for cmd in COMMAND_HISTORY:
-                        f.write(cmd + '\n')
-                COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
-            except Exception:
-                pass
-            return
-        
-        # Check for -a flag (append history file)
-        if args and args[0] == "-a":
-            # Determine which file to append to
-            history_file_to_append = HISTORY_FILE  # default
-            if len(args) > 1:
-                history_file_to_append = args[1]  # use the provided path
-            
-            try:
-                with open(history_file_to_append, 'a') as f:
-                    # Only append commands that haven't been written yet
-                    for i in range(COMMAND_HISTORY_SYNCED, len(COMMAND_HISTORY)):
-                        f.write(COMMAND_HISTORY[i] + '\n')
-                COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
-            except Exception:
-                pass
-            return
-        
-        # Determine how many history items to display
-        num_to_display = None
-        if args:
-            try:
-                num_to_display = int(args[0])
-            except (ValueError, IndexError):
-                print("history: invalid argument")
-                return
-        
-        # Use manual history list (reliably populated)
-        if not COMMAND_HISTORY:
-            return
-        
-        # Determine which items to display
-        start_index = 0
-        if num_to_display is not None:
-            start_index = max(0, len(COMMAND_HISTORY) - num_to_display)
-        
-        # Print history items with 1-indexed line numbers
-        for i in range(start_index, len(COMMAND_HISTORY)):
-            line_number = i + 1
-            print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
-    except BrokenPipeError:
-        # Right side of pipeline closed early
-        os._exit(0)
-
 
 def get_completer_script_for_command(command: str) -> str | None:
     return COMPLETION_SCRIPT_REGISTRY.get(command) 
 
+def handle_declare(args):
+    pass
 
 commands = {
     "exit": handle_exit,
@@ -287,8 +202,10 @@ commands = {
     "cd": handle_cd,
     "complete": handle_completer,
     "history": handle_history,
-    "jobs": handle_jobs
+    "jobs": handle_jobs,
+    "declare" : handle_declare
 }
+
 
 REDIRECT_MAP = {
     "1>": 1, # stdout
@@ -298,6 +215,7 @@ REDIRECT_MAP = {
     "2>>": 2,   # stderr append
     "1>>": 1   # stdout append
 }
+
 
 
 def completer(text, state):
@@ -417,26 +335,16 @@ def completer(text, state):
 
 def main():
     # Setup readline history file for persistence and arrow key recall
-    # Use HISTORY_FILE global which respects HISTFILE env var
+    # Load history from file on startup
+    load_history_file()
     
-    # Try to load history from file
+    # Try to load history via readline as well
     try:
         readline.read_history_file(HISTORY_FILE)
     except FileNotFoundError:
         pass
     except Exception:
         pass
-    
-    # Also load history into COMMAND_HISTORY list for the history builtin
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, 'r') as f:
-                for line in f:
-                    line = line.rstrip('\n\r')
-                    if line and line not in COMMAND_HISTORY:
-                        COMMAND_HISTORY.append(line)
-        except Exception:
-            pass
     
     # macOS often uses libedit, Codecrafters runner typically uses GNU readline.
     if readline.__doc__ and "libedit" in readline.__doc__:
