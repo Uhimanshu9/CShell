@@ -12,6 +12,7 @@ from .pipeline import execute_pipeline, execute_multi_stage_pipeline, parse_pipe
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
 COMMAND_HISTORY: list[str] = []  # Manual history tracking
+COMMAND_HISTORY_SYNCED: int = 0  # How many commands have been written to file
 
 # History file path - respects HISTFILE environment variable
 HISTORY_FILE: str = os.path.expanduser(os.environ.get("HISTFILE", "~/.shell_history"))
@@ -68,12 +69,14 @@ def get_filename_completions(text: str) -> list[str]:
     return sorted(completions)
 
 def handle_exit(args):
+    global COMMAND_HISTORY_SYNCED
     # Save readline history before exiting
     try:
         # Save both readline history and COMMAND_HISTORY to file
         with open(HISTORY_FILE, 'w') as f:
             for cmd in COMMAND_HISTORY:
                 f.write(cmd + '\n')
+        COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
     except Exception:
         pass
     sys.exit(0)
@@ -192,6 +195,7 @@ def handle_completer(args):
         os._exit(0)
 
 def handle_history(args):
+    global COMMAND_HISTORY_SYNCED
     try:
         # Check for -r flag (read history file)
         if args and args[0] == "-r":
@@ -222,6 +226,7 @@ def handle_history(args):
                 with open(history_file_to_write, 'w') as f:
                     for cmd in COMMAND_HISTORY:
                         f.write(cmd + '\n')
+                COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
             except Exception:
                 pass
             return
@@ -235,8 +240,10 @@ def handle_history(args):
             
             try:
                 with open(history_file_to_append, 'a') as f:
-                    for cmd in COMMAND_HISTORY:
-                        f.write(cmd + '\n')
+                    # Only append commands that haven't been written yet
+                    for i in range(COMMAND_HISTORY_SYNCED, len(COMMAND_HISTORY)):
+                        f.write(COMMAND_HISTORY[i] + '\n')
+                COMMAND_HISTORY_SYNCED = len(COMMAND_HISTORY)
             except Exception:
                 pass
             return
