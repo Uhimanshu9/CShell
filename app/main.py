@@ -179,6 +179,20 @@ def handle_completer(args):
         # Right side of pipeline closed early
         os._exit(0)
 
+def handle_history(args):
+    try:
+        # Get the number of history items
+        history_length = readline.get_history_length()
+        
+        # Print each history item with its 1-based line number
+        for i in range(1, history_length + 1):
+            history_item = readline.get_history_item(i)
+            if history_item:
+                print(f"{i:5}  {history_item}")
+    except BrokenPipeError:
+        # Right side of pipeline closed early
+        os._exit(0)
+
 
 def get_completer_script_for_command(command: str) -> str | None:
     return COMPLETION_SCRIPT_REGISTRY.get(command) 
@@ -191,6 +205,7 @@ commands = {
     "pwd": handle_present_dir,
     "cd": handle_cd,
     "complete": handle_completer,
+    "history": handle_history,
     "jobs": handle_jobs
 }
 
@@ -359,6 +374,10 @@ def main():
                 continuation = sys.stdin.readline().rstrip()
 
                 user_command += "\n" + continuation
+
+        # Add command to readline history after successful parsing
+        if user_command.strip():
+            readline.add_history(user_command)
 
         if not parts:
             continue
