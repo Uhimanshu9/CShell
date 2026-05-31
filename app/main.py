@@ -262,34 +262,60 @@ def expand_raw_command(cmd_str: str) -> str:
             result.append(char)
             i += 1
         elif char == '$' and not in_single_quote:
-            # Parse variable name
-            start = i + 1
-            j = start
-            
-            # The first char of a shell variable must be a letter or underscore
-            if j < n and (cmd_str[j].isalpha() or cmd_str[j] == '_'):
-                j += 1
-                while j < n and (cmd_str[j].isalnum() or cmd_str[j] == '_'):
+            # Check if this is the braced form ${VAR}
+            if i + 1 < n and cmd_str[i+1] == '{':
+                start = i + 2
+                j = start
+                while j < n and cmd_str[j] != '}':
                     j += 1
-            
-            if j > start:
-                var_name = cmd_str[start:j]
-                # Look up in SHELL_VARIABLES first, then os.environ, default to empty
-                if var_name in SHELL_VARIABLES:
-                    val = SHELL_VARIABLES[var_name]
-                elif var_name in os.environ:
-                    val = os.environ[var_name]
-                else:
-                    val = ""
                 
-                # Escape so shlex treats special characters as literals
-                escaped_val = escape_for_shlex(val)
-                result.append(escaped_val)
-                i = j
+                if j < n and cmd_str[j] == '}':
+                    var_name = cmd_str[start:j]
+                    
+                    # Look up in SHELL_VARIABLES first, then os.environ, default to empty
+                    if var_name in SHELL_VARIABLES:
+                        val = SHELL_VARIABLES[var_name]
+                    elif var_name in os.environ:
+                        val = os.environ[var_name]
+                    else:
+                        val = ""
+                    
+                    escaped_val = escape_for_shlex(val)
+                    result.append(escaped_val)
+                    i = j + 1  # advance past '}'
+                else:
+                    # No closing brace found, treat as literal
+                    result.append(char)
+                    i += 1
             else:
-                # Literal '$'
-                result.append(char)
-                i += 1
+                # Parse standard $VAR variable name
+                start = i + 1
+                j = start
+                
+                # The first char of a shell variable must be a letter or underscore
+                if j < n and (cmd_str[j].isalpha() or cmd_str[j] == '_'):
+                    j += 1
+                    while j < n and (cmd_str[j].isalnum() or cmd_str[j] == '_'):
+                        j += 1
+                
+                if j > start:
+                    var_name = cmd_str[start:j]
+                    # Look up in SHELL_VARIABLES first, then os.environ, default to empty
+                    if var_name in SHELL_VARIABLES:
+                        val = SHELL_VARIABLES[var_name]
+                    elif var_name in os.environ:
+                        val = os.environ[var_name]
+                    else:
+                        val = ""
+                    
+                    # Escape so shlex treats special characters as literals
+                    escaped_val = escape_for_shlex(val)
+                    result.append(escaped_val)
+                    i = j
+                else:
+                    # Literal '$'
+                    result.append(char)
+                    i += 1
         else:
             result.append(char)
             i += 1
