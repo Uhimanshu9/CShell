@@ -226,6 +226,21 @@ def handle_history(args):
                 pass
             return
         
+        # Check for -a flag (append history file)
+        if args and args[0] == "-a":
+            # Determine which file to append to
+            history_file_to_append = HISTORY_FILE  # default
+            if len(args) > 1:
+                history_file_to_append = args[1]  # use the provided path
+            
+            try:
+                with open(history_file_to_append, 'a') as f:
+                    for cmd in COMMAND_HISTORY:
+                        f.write(cmd + '\n')
+            except Exception:
+                pass
+            return
+        
         # Determine how many history items to display
         num_to_display = None
         if args:
