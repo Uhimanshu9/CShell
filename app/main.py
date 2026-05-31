@@ -182,10 +182,27 @@ def handle_completer(args):
 
 def handle_history(args):
     try:
+        # Determine how many history items to display
+        num_to_display = None
+        if args:
+            try:
+                num_to_display = int(args[0])
+            except (ValueError, IndexError):
+                print("history: invalid argument")
+                return
+        
         # Display history from our manual tracking list
         # History is 1-indexed for display
-        for i, cmd in enumerate(COMMAND_HISTORY, 1):
-            print(f"{i:5}  {cmd}")
+        history_length = len(COMMAND_HISTORY)
+        start_index = 0
+        
+        if num_to_display is not None:
+            # Show only the last N items
+            start_index = max(0, history_length - num_to_display)
+        
+        for i in range(start_index, history_length):
+            line_number = i + 1  # 1-indexed line number
+            print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
     except BrokenPipeError:
         # Right side of pipeline closed early
         os._exit(0)
