@@ -197,34 +197,19 @@ def handle_history(args):
                 print("history: invalid argument")
                 return
         
-        # Use manual history list (most reliable)
-        history_list = COMMAND_HISTORY if COMMAND_HISTORY else []
-        
-        # Also check readline history
-        try:
-            history_length = readline.get_history_length()
-            if history_length > 0 and not history_list:
-                # Only use readline if COMMAND_HISTORY is empty
-                history_list = []
-                for i in range(1, history_length + 1):
-                    item = readline.get_history_item(i)
-                    if item:
-                        history_list.append(item)
-        except Exception:
-            pass
-        
-        if not history_list:
+        # Use manual history list (reliably populated)
+        if not COMMAND_HISTORY:
             return
         
         # Determine which items to display
         start_index = 0
         if num_to_display is not None:
-            start_index = max(0, len(history_list) - num_to_display)
+            start_index = max(0, len(COMMAND_HISTORY) - num_to_display)
         
-        # Print history items
-        for i in range(start_index, len(history_list)):
-            line_number = i + 1  # 1-indexed line numbers
-            print(f"{line_number:5}  {history_list[i]}")
+        # Print history items with 1-indexed line numbers
+        for i in range(start_index, len(COMMAND_HISTORY)):
+            line_number = i + 1
+            print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
     except BrokenPipeError:
         # Right side of pipeline closed early
         os._exit(0)
@@ -422,12 +407,8 @@ def main():
 
                 user_command += "\n" + continuation
 
-        # Track in both readline and manual history
+        # Track in manual history for the history builtin
         if user_command.strip():
-            try:
-                readline.add_history(user_command)
-            except Exception:
-                pass  # In case readline is not available
             COMMAND_HISTORY.append(user_command)
 
         if not parts:
