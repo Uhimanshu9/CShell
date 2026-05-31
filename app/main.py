@@ -5,6 +5,7 @@ import readline
 import subprocess
 
 from .jobs import handle_jobs, notify_done_jobs, register_job
+from .pipeline import execute_pipeline
 
 
 
@@ -352,6 +353,21 @@ def main():
             parts = parts[:-1]
             if not parts:
                 continue
+
+        # Check for pipeline (|) - handle before redirection
+        # --------------------------------------------------------------------------------------#
+        if "|" in parts:
+            pipe_index = parts.index("|")
+            left_cmd = parts[:pipe_index]
+            right_cmd = parts[pipe_index + 1:]
+            
+            if not left_cmd or not right_cmd:
+                print("Invalid pipeline syntax")
+                continue
+            
+            # Execute pipeline and skip to next iteration
+            execute_pipeline(left_cmd, right_cmd)
+            continue
 
         # index of output redirection operator (1>, >, 2>)
 # --------------------------------------------------------------------------------------#
