@@ -424,9 +424,9 @@ def main():
 
                 user_command += "\n" + continuation
 
-        # Add command to readline history and our manual history after successful parsing
+        # Add command to our manual history for the history builtin
+        # Let readline manage its own history automatically through input()
         if user_command.strip():
-            readline.add_history(user_command)
             COMMAND_HISTORY.append(user_command)
 
         if not parts:
