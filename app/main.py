@@ -396,9 +396,6 @@ def main():
 
     while True:
 
-        # sys.stdout.write("$ ")
-        # sys.stdout.flush()
-
         # Print automatic job completion recaps before the next prompt.
         notify_done_jobs()
 
@@ -424,8 +421,7 @@ def main():
 
                 user_command += "\n" + continuation
 
-        # Add command to our manual history for the history builtin
-        # Let readline manage its own history automatically through input()
+        # Track in manual history for logging/debugging
         if user_command.strip():
             COMMAND_HISTORY.append(user_command)
 
