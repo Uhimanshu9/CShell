@@ -211,6 +211,21 @@ def handle_history(args):
                     pass
             return
         
+        # Check for -w flag (write history file)
+        if args and args[0] == "-w":
+            # Determine which file to write to
+            history_file_to_write = HISTORY_FILE  # default
+            if len(args) > 1:
+                history_file_to_write = args[1]  # use the provided path
+            
+            try:
+                with open(history_file_to_write, 'w') as f:
+                    for cmd in COMMAND_HISTORY:
+                        f.write(cmd + '\n')
+            except Exception:
+                pass
+            return
+        
         # Determine how many history items to display
         num_to_display = None
         if args:
