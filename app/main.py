@@ -17,6 +17,7 @@ from .history import (
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
+SHELL_VARIABLES: dict[str, str] = {}  # Variables declared in the shell
 
 PROMPT = "$ "
 
@@ -192,7 +193,29 @@ def get_completer_script_for_command(command: str) -> str | None:
     return COMPLETION_SCRIPT_REGISTRY.get(command) 
 
 def handle_declare(args):
-    pass
+    """Handle the declare builtin command.
+    
+    Supports:
+    - declare -p NAME: Print a description of the variable NAME
+    """
+    if not args:
+        return
+    
+    # Check for -p flag
+    if args[0] == "-p":
+        if len(args) < 2:
+            print("declare: -p: argument required")
+            return
+        
+        var_name = args[1]
+        
+        # Check if variable exists
+        if var_name in SHELL_VARIABLES:
+            value = SHELL_VARIABLES[var_name]
+            print(f'declare -- {var_name}="{value}"')
+        else:
+            print(f"declare: {var_name}: not found")
+            return
 
 commands = {
     "exit": handle_exit,
