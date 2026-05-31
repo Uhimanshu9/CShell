@@ -215,6 +215,89 @@ def is_valid_identifier(name: str) -> bool:
     return True
 
 
+def escape_for_shlex(s: str) -> str:
+    """Escape backslashes, single quotes, and double quotes for shlex.split.
+    
+    This ensures that when a variable value containing these characters is expanded
+    in the raw command line, shlex.split treats them as literal characters instead
+    of syntax.
+    """
+    res = []
+    for char in s:
+        if char in ('\\', "'", '"'):
+            res.append('\\' + char)
+        else:
+            res.append(char)
+    return "".join(res)
+
+
+def expand_raw_command(cmd_str: str) -> str:
+    """Expand $VAR references in a raw command string.
+    
+    Respects single quotes (no expansion) and double quotes (expansion).
+    """
+    result = []
+    i = 0
+    n = len(cmd_str)
+    in_single_quote = False
+    in_double_quote = False
+    
+    while i < n:
+        char = cmd_str[i]
+        
+        # Handle escape characters
+        if char == '\\' and not in_single_quote:
+            if i + 1 < n:
+                result.append(char)
+                result.append(cmd_str[i+1])
+                i += 2
+                continue
+        
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+            result.append(char)
+            i += 1
+        elif char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            result.append(char)
+            i += 1
+        elif char == '$' and not in_single_quote:
+            # Parse variable name
+            start = i + 1
+            j = start
+            
+            # The first char of a shell variable must be a letter or underscore
+            if j < n and (cmd_str[j].isalpha() or cmd_str[j] == '_'):
+                j += 1
+                while j < n and (cmd_str[j].isalnum() or cmd_str[j] == '_'):
+                    j += 1
+            
+            if j > start:
+                var_name = cmd_str[start:j]
+                # Look up in SHELL_VARIABLES first, then os.environ, default to empty
+                if var_name in SHELL_VARIABLES:
+                    val = SHELL_VARIABLES[var_name]
+                elif var_name in os.environ:
+                    val = os.environ[var_name]
+                else:
+                    val = ""
+                
+                # Escape so shlex treats special characters as literals
+                escaped_val = escape_for_shlex(val)
+                result.append(escaped_val)
+                i = j
+            else:
+                # Literal '$'
+                result.append(char)
+                i += 1
+        else:
+            result.append(char)
+            i += 1
+            
+    return "".join(result)
+
+
+
 def handle_declare(args):
     """Handle the declare builtin command.
     
@@ -439,7 +522,7 @@ def main():
 
             try:
 
-                parts = shlex.split(user_command)
+                shlex.split(user_command)
                 break
 
             except ValueError:
@@ -450,6 +533,9 @@ def main():
                 continuation = sys.stdin.readline().rstrip()
 
                 user_command += "\n" + continuation
+
+        expanded_command = expand_raw_command(user_command)
+        parts = shlex.split(expanded_command)
 
         # Track in manual history for the history builtin
         if user_command.strip():
