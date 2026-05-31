@@ -302,6 +302,13 @@ def expand_raw_command(cmd_str: str) -> str:
 
 
 
+def handle_games(args):
+    """Handle the games/enjoy shell builtin, launching a terminal game menu."""
+    from .game import run_games_system
+    run_games_system()
+
+
+
 commands = {
     "exit": handle_exit,
     "echo": handle_echo,
@@ -311,7 +318,10 @@ commands = {
     "complete": handle_completer,
     "history": handle_history,
     "jobs": handle_jobs,
-    "declare" : handle_declare
+    "declare" : handle_declare,
+    "games": handle_games,
+    "enjoy": handle_games,
+    "game": handle_games
 }
 
 
