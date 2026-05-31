@@ -11,6 +11,7 @@ from .pipeline import execute_pipeline, execute_multi_stage_pipeline, parse_pipe
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
+COMMAND_HISTORY: list[str] = []  # Manual history tracking
 
 PROMPT = "$ "
 
@@ -181,14 +182,10 @@ def handle_completer(args):
 
 def handle_history(args):
     try:
-        # Get the number of history items
-        history_length = readline.get_history_length()
-        
-        # Print each history item with its 1-based line number
-        for i in range(1, history_length + 1):
-            history_item = readline.get_history_item(i)
-            if history_item:
-                print(f"{i:5}  {history_item}")
+        # Display history from our manual tracking list
+        # History is 1-indexed for display
+        for i, cmd in enumerate(COMMAND_HISTORY, 1):
+            print(f"{i:5}  {cmd}")
     except BrokenPipeError:
         # Right side of pipeline closed early
         os._exit(0)
@@ -375,9 +372,10 @@ def main():
 
                 user_command += "\n" + continuation
 
-        # Add command to readline history after successful parsing
+        # Add command to readline history and our manual history after successful parsing
         if user_command.strip():
             readline.add_history(user_command)
+            COMMAND_HISTORY.append(user_command)
 
         if not parts:
             continue
