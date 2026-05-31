@@ -196,6 +196,7 @@ def handle_declare(args):
     """Handle the declare builtin command.
     
     Supports:
+    - declare NAME=VALUE: Store a shell variable
     - declare -p NAME: Print a description of the variable NAME
     """
     if not args:
@@ -215,6 +216,18 @@ def handle_declare(args):
             print(f'declare -- {var_name}="{value}"')
         else:
             print(f"declare: {var_name}: not found")
+            return
+    else:
+        # Handle declare NAME=VALUE
+        assignment = args[0]
+        
+        # Check if it contains an equals sign
+        if "=" in assignment:
+            var_name, var_value = assignment.split("=", 1)
+            SHELL_VARIABLES[var_name] = var_value
+        else:
+            # If no equals sign, treat as a flag or error
+            print(f"declare: {assignment}: invalid option")
             return
 
 commands = {
