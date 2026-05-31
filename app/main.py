@@ -188,6 +188,20 @@ def handle_completer(args):
 
 def handle_history(args):
     try:
+        # Check for -r flag (read history file)
+        if args and args[0] == "-r":
+            history_file = os.path.expanduser("~/.shell_history")
+            if os.path.exists(history_file):
+                try:
+                    with open(history_file, 'r') as f:
+                        for line in f:
+                            line = line.rstrip('\n\r')
+                            if line and line not in COMMAND_HISTORY:
+                                COMMAND_HISTORY.append(line)
+                except Exception:
+                    pass
+            return
+        
         # Determine how many history items to display
         num_to_display = None
         if args:
