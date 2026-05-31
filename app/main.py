@@ -13,6 +13,9 @@ path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
 COMMAND_HISTORY: list[str] = []  # Manual history tracking
 
+# History file path - respects HISTFILE environment variable
+HISTORY_FILE: str = os.path.expanduser(os.environ.get("HISTFILE", "~/.shell_history"))
+
 PROMPT = "$ "
 
 # Used to implement: first TAB rings bell, second TAB shows all candidates.
@@ -67,8 +70,10 @@ def get_filename_completions(text: str) -> list[str]:
 def handle_exit(args):
     # Save readline history before exiting
     try:
-        history_file = os.path.expanduser("~/.shell_history")
-        readline.write_history_file(history_file)
+        # Save both readline history and COMMAND_HISTORY to file
+        with open(HISTORY_FILE, 'w') as f:
+            for cmd in COMMAND_HISTORY:
+                f.write(cmd + '\n')
     except Exception:
         pass
     sys.exit(0)
@@ -190,10 +195,9 @@ def handle_history(args):
     try:
         # Check for -r flag (read history file)
         if args and args[0] == "-r":
-            history_file = os.path.expanduser("~/.shell_history")
-            if os.path.exists(history_file):
+            if os.path.exists(HISTORY_FILE):
                 try:
-                    with open(history_file, 'r') as f:
+                    with open(HISTORY_FILE, 'r') as f:
                         for line in f:
                             line = line.rstrip('\n\r')
                             if line and line not in COMMAND_HISTORY:
@@ -371,15 +375,26 @@ def completer(text, state):
 
 def main():
     # Setup readline history file for persistence and arrow key recall
-    history_file = os.path.expanduser("~/.shell_history")
+    # Use HISTORY_FILE global which respects HISTFILE env var
     
     # Try to load history from file
     try:
-        readline.read_history_file(history_file)
+        readline.read_history_file(HISTORY_FILE)
     except FileNotFoundError:
         pass
     except Exception:
         pass
+    
+    # Also load history into COMMAND_HISTORY list for the history builtin
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                for line in f:
+                    line = line.rstrip('\n\r')
+                    if line and line not in COMMAND_HISTORY:
+                        COMMAND_HISTORY.append(line)
+        except Exception:
+            pass
     
     # macOS often uses libedit, Codecrafters runner typically uses GNU readline.
     if readline.__doc__ and "libedit" in readline.__doc__:
