@@ -67,42 +67,50 @@ def handle_exit(args):
     sys.exit(0)
 
 def handle_echo(args):
-    print(" ".join(args))
+    try:
+        print(" ".join(args))
+    except BrokenPipeError:
+        # Right side of pipeline closed early (e.g., head -n 5)
+        # This is normal - exit gracefully
+        os._exit(0)
 
 def handle_type(args):
-
-    # No command provided
-    if not args:
-        print("type: missing argument")
-        return
-
-    command_name = args[0]
-
-    # Step 1: Check builtin commands
-    if command_name in commands:
-        print(f"{command_name} is a shell builtin")
-        return
-
-    # Step 2: Search PATH directories
-    paths = os.environ["PATH"].split(":")
-
-    for path in paths:
-
-        # Create full path like:
-        # /usr/bin/ls
-        full_path = os.path.join(path, command_name)
-
-        # Step 3:
-        # Check:
-        # 1. file exists
-        # 2. file is executable
-        if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
-
-            print(f"{command_name} is {full_path}")
+    try:
+        # No command provided
+        if not args:
+            print("type: missing argument")
             return
 
-    # Step 4: Not found anywhere
-    print(f"{command_name}: not found")
+        command_name = args[0]
+
+        # Step 1: Check builtin commands
+        if command_name in commands:
+            print(f"{command_name} is a shell builtin")
+            return
+
+        # Step 2: Search PATH directories
+        paths = os.environ["PATH"].split(":")
+
+        for path in paths:
+
+            # Create full path like:
+            # /usr/bin/ls
+            full_path = os.path.join(path, command_name)
+
+            # Step 3:
+            # Check:
+            # 1. file exists
+            # 2. file is executable
+            if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+
+                print(f"{command_name} is {full_path}")
+                return
+
+        # Step 4: Not found anywhere
+        print(f"{command_name}: not found")
+    except BrokenPipeError:
+        # Right side of pipeline closed early
+        os._exit(0)
 
 def execute_external(command_name, command_args, *, wait: bool = True) -> subprocess.Popen | None:
     try:
@@ -116,7 +124,11 @@ def execute_external(command_name, command_args, *, wait: bool = True) -> subpro
     return process
 
 def handle_present_dir(args):
-    print(os.getcwd())
+    try:
+        print(os.getcwd())
+    except BrokenPipeError:
+        # Right side of pipeline closed early
+        os._exit(0)
 
 def handle_cd(args):
     if not args:
@@ -135,33 +147,37 @@ def handle_cd(args):
         print(f"cd: {path}: No such file or directory")
 
 def handle_completer(args):
-    if "-p" in args or "--path" in args:
-        if len(args) == 2:
-            target = args[1]
-            if target in COMPLETION_SCRIPT_REGISTRY:
-                print(f"complete -C '{COMPLETION_SCRIPT_REGISTRY[args[1]]}' {args[1]}")
+    try:
+        if "-p" in args or "--path" in args:
+            if len(args) == 2:
+                target = args[1]
+                if target in COMPLETION_SCRIPT_REGISTRY:
+                    print(f"complete -C '{COMPLETION_SCRIPT_REGISTRY[args[1]]}' {args[1]}")
+                else:
+                    print(f"complete: {target}: no completion specification") 
             else:
-                print(f"complete: {target}: no completion specification") 
-        else:
+                    raise ValueError("Invalid complete option")
+        elif "-r" in args:
+            if len(args) == 2:
+                target = args[1]
+                # Remove any stored completion rule for this command.
+                # Produce no output on success.
+                COMPLETION_SCRIPT_REGISTRY.pop(target, None)
+            else:
                 raise ValueError("Invalid complete option")
-    elif "-r" in args:
-        if len(args) == 2:
-            target = args[1]
-            # Remove any stored completion rule for this command.
-            # Produce no output on success.
-            COMPLETION_SCRIPT_REGISTRY.pop(target, None)
+        elif "-C" in args:
+            if len(args) == 3:
+                target = args[2]
+                script = args[1]
+                COMPLETION_SCRIPT_REGISTRY[target] = script
+                # print(f"Registered completion script for {target}")
+            else:
+                    raise ValueError("Invalid complete option")
         else:
             raise ValueError("Invalid complete option")
-    elif "-C" in args:
-        if len(args) == 3:
-            target = args[2]
-            script = args[1]
-            COMPLETION_SCRIPT_REGISTRY[target] = script
-            # print(f"Registered completion script for {target}")
-        else:
-                raise ValueError("Invalid complete option")
-    else:
-        raise ValueError("Invalid complete option")
+    except BrokenPipeError:
+        # Right side of pipeline closed early
+        os._exit(0)
 
 
 def get_completer_script_for_command(command: str) -> str | None:
@@ -365,8 +381,8 @@ def main():
                 print("Invalid pipeline syntax")
                 continue
             
-            # Execute pipeline and skip to next iteration
-            execute_pipeline(left_cmd, right_cmd)
+            # Execute pipeline with support for both built-in and external commands
+            execute_pipeline(left_cmd, right_cmd, commands)
             continue
 
         # index of output redirection operator (1>, >, 2>)
