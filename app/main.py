@@ -197,33 +197,34 @@ def handle_history(args):
                 print("history: invalid argument")
                 return
         
-        # Get history from readline
-        history_length = readline.get_history_length()
+        # Use manual history list (most reliable)
+        history_list = COMMAND_HISTORY if COMMAND_HISTORY else []
         
-        # If history_length is 0 or -1, fall back to manual history list
-        if history_length <= 0 and COMMAND_HISTORY:
-            history_length = len(COMMAND_HISTORY)
-            start_index = 0
-            
-            if num_to_display is not None:
-                start_index = max(0, history_length - num_to_display)
-            
-            for i in range(start_index, history_length):
-                line_number = i + 1
-                print(f"{line_number:5}  {COMMAND_HISTORY[i]}")
+        # Also check readline history
+        try:
+            history_length = readline.get_history_length()
+            if history_length > 0 and not history_list:
+                # Only use readline if COMMAND_HISTORY is empty
+                history_list = []
+                for i in range(1, history_length + 1):
+                    item = readline.get_history_item(i)
+                    if item:
+                        history_list.append(item)
+        except Exception:
+            pass
+        
+        if not history_list:
             return
         
-        # Display history from readline
-        start_index = 1  # readline history is 1-indexed
-        
+        # Determine which items to display
+        start_index = 0
         if num_to_display is not None:
-            # Show only the last N items
-            start_index = max(1, history_length - num_to_display + 1)
+            start_index = max(0, len(history_list) - num_to_display)
         
-        for i in range(start_index, history_length + 1):
-            history_item = readline.get_history_item(i)
-            if history_item:
-                print(f"{i:5}  {history_item}")
+        # Print history items
+        for i in range(start_index, len(history_list)):
+            line_number = i + 1  # 1-indexed line numbers
+            print(f"{line_number:5}  {history_list[i]}")
     except BrokenPipeError:
         # Right side of pipeline closed early
         os._exit(0)
@@ -421,8 +422,12 @@ def main():
 
                 user_command += "\n" + continuation
 
-        # Track in manual history for logging/debugging
+        # Track in both readline and manual history
         if user_command.strip():
+            try:
+                readline.add_history(user_command)
+            except Exception:
+                pass  # In case readline is not available
             COMMAND_HISTORY.append(user_command)
 
         if not parts:
