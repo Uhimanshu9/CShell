@@ -19,7 +19,7 @@ path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
 from .declare import SHELL_VARIABLES, handle_declare
 
-PROMPT = "$ "
+PROMPT = "roger $ "
 
 # Used to implement: first TAB rings bell, second TAB shows all candidates.
 LAST_AMBIGUOUS_TAB_KEY: tuple[str, int, int] | None = None
@@ -335,6 +335,37 @@ REDIRECT_MAP = {
 }
 
 
+def tokenize_command(command_line: str) -> tuple[list[str] | None, str | None]:
+    """Tokenize one input line and return a user-facing syntax error, if any."""
+    try:
+        return shlex.split(command_line), None
+    except ValueError as error:
+        if "No closing quotation" in str(error):
+            return None, "unterminated quote"
+        if "No escaped character" in str(error):
+            return None, "unterminated escape"
+        return None, "invalid command"
+
+
+def validate_command_syntax(parts: list[str]) -> str | None:
+    """Return a shell-style syntax error before any command is executed."""
+    for index, part in enumerate(parts):
+        if part == "|":
+            if index == 0 or parts[index - 1] == "|":
+                return "syntax error near unexpected token `|`"
+            if index == len(parts) - 1:
+                return "syntax error near unexpected token `newline`"
+
+        if part in REDIRECT_MAP:
+            if index == len(parts) - 1:
+                return "syntax error near unexpected token `newline`"
+            next_part = parts[index + 1]
+            if next_part in REDIRECT_MAP or next_part == "|":
+                return f"syntax error near unexpected token `{next_part}`"
+
+    return None
+
+
 
 def completer(text, state):
     try:
@@ -484,28 +515,25 @@ def main():
 
         # user_command = sys.stdin.readline().rstrip()
         try:
-            user_command = input("$ ")
+            user_command = input(PROMPT)
         except EOFError:
             return
 
-        while True:
-
-            try:
-
-                shlex.split(user_command)
-                break
-
-            except ValueError:
-
-                sys.stdout.write("> ")
-                sys.stdout.flush()
-
-                continuation = sys.stdin.readline().rstrip()
-
-                user_command += "\n" + continuation
+        parts, syntax_error = tokenize_command(user_command)
+        if syntax_error:
+            print(f"roger: {syntax_error}")
+            continue
 
         expanded_command = expand_raw_command(user_command)
-        parts = shlex.split(expanded_command)
+        parts, syntax_error = tokenize_command(expanded_command)
+        if syntax_error:
+            print(f"roger: {syntax_error}")
+            continue
+
+        syntax_error = validate_command_syntax(parts)
+        if syntax_error:
+            print(f"roger: {syntax_error}")
+            continue
 
         # Track in manual history for the history builtin
         if user_command.strip():
