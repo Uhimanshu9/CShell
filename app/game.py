@@ -2,6 +2,65 @@ import curses
 import random
 import time
 import os
+import unicodedata
+
+
+class SafeWindow:
+    """A curses window wrapper that never draws beyond the visible screen.
+
+    The games use fixed-size art and wide Unicode characters.  Native curses
+    raises ``curses.error`` when a draw reaches the terminal's lower-right
+    cell, or when the terminal is smaller than that art.  This wrapper clips
+    each character before passing it to curses, so a small terminal shows as
+    much of the game as it can instead of terminating the game session.
+    """
+
+    def __init__(self, window):
+        self._window = window
+
+    def __getattr__(self, name):
+        return getattr(self._window, name)
+
+    @staticmethod
+    def _display_width(char):
+        if unicodedata.combining(char):
+            return 0
+        return 2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1
+
+    def addstr(self, *args):
+        """Safely implement both ``addstr(y, x, text, attr)`` forms."""
+        if len(args) >= 3 and isinstance(args[0], int) and isinstance(args[1], int):
+            y, x, text = args[:3]
+            attr = args[3] if len(args) > 3 else curses.A_NORMAL
+        else:
+            if not args:
+                return
+            y, x = self._window.getyx()
+            text = args[0]
+            attr = args[1] if len(args) > 1 else curses.A_NORMAL
+
+        height, width = self._window.getmaxyx()
+        if not isinstance(text, str) or y < 0 or y >= height or width <= 0:
+            return
+
+        for char in text:
+            if char == "\n":
+                y, x = y + 1, 0
+                if y >= height:
+                    return
+                continue
+
+            char_width = self._display_width(char)
+            # Avoid the lower-right cell too: many curses implementations
+            # report an error even though they successfully write into it.
+            if x < 0 or x + max(char_width, 1) >= width:
+                return
+            try:
+                self._window.addstr(y, x, char, attr)
+            except curses.error:
+                # Some terminals cannot render a particular wide glyph.
+                pass
+            x += char_width
 
 # ====================================================================================== #
 # COLOR AND GRAPHICS HELPERS
@@ -596,6 +655,9 @@ def run_games_system():
     """Wrapper function to execute games within a curses terminal session."""
     try:
         def main_menu(stdscr):
+            # Route every game draw through the bounds-checking wrapper.  The
+            # rest of the game code can continue to use the normal curses API.
+            stdscr = SafeWindow(stdscr)
             init_game_colors()  # Initialize color systems once
             while True:
                 choice = draw_menu(stdscr)
