@@ -44,14 +44,14 @@ def execute_command_in_child(cmd_list: list[str], commands_dict: dict) -> None:
             sys.stderr.flush()
             
             # Call the built-in function
-            commands_dict[command_name](args)
+            result = commands_dict[command_name](args)
             
             # Flush again after execution
             sys.stdout.flush()
             sys.stderr.flush()
             
             # Exit child successfully
-            os._exit(0)
+            os._exit(result if isinstance(result, int) else 0)
         except SystemExit:
             # handle_exit() calls sys.exit()
             # In a child process, convert this to os._exit()
@@ -152,7 +152,7 @@ def close_all_pipes(pipes: list[tuple[int, int]]) -> None:
         os.close(write_fd)
 
 
-def execute_multi_stage_pipeline(stages: list[list[str]], commands_dict: dict) -> None:
+def execute_multi_stage_pipeline(stages: list[list[str]], commands_dict: dict) -> int:
     """
     Execute N commands in a multi-stage pipeline.
     
@@ -212,11 +212,15 @@ def execute_multi_stage_pipeline(stages: list[list[str]], commands_dict: dict) -
     close_all_pipes(pipes)
     
     # Parent wait: wait for all children to finish
+    last_status = 0
     for pid in pids:
-        os.waitpid(pid, 0)
+        _, status = os.waitpid(pid, 0)
+        if pid == pids[-1]:
+            last_status = os.waitstatus_to_exitcode(status)
+    return last_status
 
 
-def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: dict) -> None:
+def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: dict) -> int:
     """
     Execute two commands connected by a pipe: left_cmd | right_cmd
     
@@ -285,10 +289,11 @@ def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: d
     # Child 1 writes to pipe, then exits
     # Child 2 reads from pipe, then exits
     os.waitpid(pid1, 0)
-    os.waitpid(pid2, 0)
+    _, status = os.waitpid(pid2, 0)
+    return os.waitstatus_to_exitcode(status)
 
 
-def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: dict) -> None:
+def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: dict) -> int:
     """
     Execute two commands connected by a pipe: left_cmd | right_cmd
     
@@ -357,4 +362,5 @@ def execute_pipeline(left_cmd: list[str], right_cmd: list[str], commands_dict: d
     # Child 1 writes to pipe, then exits
     # Child 2 reads from pipe, then exits
     os.waitpid(pid1, 0)
-    os.waitpid(pid2, 0)
+    _, status = os.waitpid(pid2, 0)
+    return os.waitstatus_to_exitcode(status)
