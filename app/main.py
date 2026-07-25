@@ -17,9 +17,12 @@ from .history import (
 
 path = os.environ["PATH"].split(":")
 COMPLETION_SCRIPT_REGISTRY: dict[str, str] = {}
-from .declare import SHELL_VARIABLES, handle_declare
+from .declare import SHELL_VARIABLES, handle_declare, is_valid_identifier
 
 PROMPT = "roger $ "
+LAST_EXIT_STATUS = 0
+EXPORTED_VARIABLES: set[str] = set()
+PREVIOUS_DIRECTORY: str | None = None
 
 # Used to implement: first TAB rings bell, second TAB shows all candidates.
 LAST_AMBIGUOUS_TAB_KEY: tuple[str, int, int] | None = None
@@ -140,20 +143,78 @@ def handle_present_dir(args):
         os._exit(0)
 
 def handle_cd(args):
+    global PREVIOUS_DIRECTORY
+    if len(args) > 1:
+        print("cd: too many arguments")
+        return 1
     if not args:
-        print("cd: missing argument")
-        return
-    
-    path = args[0]
-
-    if path == '~':
-        path = os.path.expanduser("~")
-
-    # check if the directory exists
-    if os.path.isdir(path):
-        os.chdir(path)
+        path = os.environ.get("HOME")
+        if not path:
+            print("cd: HOME not set")
+            return 1
+    elif args[0] == "-":
+        if PREVIOUS_DIRECTORY is None:
+            print("cd: OLDPWD not set")
+            return 1
+        path = PREVIOUS_DIRECTORY
+        print(path)
     else:
+        path = os.path.expanduser(args[0])
+    if not os.path.isdir(path):
         print(f"cd: {path}: No such file or directory")
+        return 1
+    previous_directory = os.getcwd()
+    os.chdir(path)
+    PREVIOUS_DIRECTORY = previous_directory
+    return 0
+
+
+def handle_export(args):
+    if not args:
+        for name in sorted(EXPORTED_VARIABLES):
+            print(f'declare -x {name}="{os.environ.get(name, "")}"')
+        return 0
+    status = 0
+    for argument in args:
+        if "=" in argument:
+            name, value = argument.split("=", 1)
+            if not is_valid_identifier(name):
+                print(f"export: `{argument}': not a valid identifier")
+                status = 1
+                continue
+            SHELL_VARIABLES[name] = value
+        else:
+            name = argument
+            if not is_valid_identifier(name):
+                print(f"export: `{argument}': not a valid identifier")
+                status = 1
+                continue
+            value = SHELL_VARIABLES.get(name, os.environ.get(name, ""))
+        os.environ[name] = value
+        EXPORTED_VARIABLES.add(name)
+    return status
+
+
+def handle_unset(args):
+    status = 0
+    for name in args:
+        if not is_valid_identifier(name):
+            print(f"unset: `{name}': not a valid identifier")
+            status = 1
+            continue
+        SHELL_VARIABLES.pop(name, None)
+        os.environ.pop(name, None)
+        EXPORTED_VARIABLES.discard(name)
+    return status
+
+
+def handle_env(args):
+    if args:
+        print("env: command execution is not supported")
+        return 2
+    for name, value in sorted(os.environ.items()):
+        print(f"{name}={value}")
+    return 0
 
 def handle_completer(args):
     try:
@@ -251,7 +312,9 @@ def expand_raw_command(cmd_str: str) -> str:
                     var_name = cmd_str[start:j]
                     
                     # Look up in SHELL_VARIABLES first, then os.environ, default to empty
-                    if var_name in SHELL_VARIABLES:
+                    if var_name == "?":
+                        val = str(LAST_EXIT_STATUS)
+                    elif var_name in SHELL_VARIABLES:
                         val = SHELL_VARIABLES[var_name]
                     elif var_name in os.environ:
                         val = os.environ[var_name]
@@ -269,6 +332,11 @@ def expand_raw_command(cmd_str: str) -> str:
                 # Parse standard $VAR variable name
                 start = i + 1
                 j = start
+
+                if j < n and cmd_str[j] == '?':
+                    result.append(str(LAST_EXIT_STATUS))
+                    i = j + 1
+                    continue
                 
                 # The first char of a shell variable must be a letter or underscore
                 if j < n and (cmd_str[j].isalpha() or cmd_str[j] == '_'):
@@ -319,6 +387,9 @@ commands = {
     "history": handle_history,
     "jobs": handle_jobs,
     "declare" : handle_declare,
+    "export": handle_export,
+    "unset": handle_unset,
+    "env": handle_env,
     "games": handle_games,
     "enjoy": handle_games,
     "game": handle_games
@@ -483,6 +554,7 @@ def completer(text, state):
 
 
 def main():
+    global LAST_EXIT_STATUS
     # Setup readline history file for persistence and arrow key recall
     # Load history from file on startup
     load_history_file()
@@ -522,17 +594,20 @@ def main():
         parts, syntax_error = tokenize_command(user_command)
         if syntax_error:
             print(f"roger: {syntax_error}")
+            LAST_EXIT_STATUS = 2
             continue
 
         expanded_command = expand_raw_command(user_command)
         parts, syntax_error = tokenize_command(expanded_command)
         if syntax_error:
             print(f"roger: {syntax_error}")
+            LAST_EXIT_STATUS = 2
             continue
 
         syntax_error = validate_command_syntax(parts)
         if syntax_error:
             print(f"roger: {syntax_error}")
+            LAST_EXIT_STATUS = 2
             continue
 
         # Track in manual history for the history builtin
@@ -558,13 +633,14 @@ def main():
             if stages:
                 if len(stages) == 2:
                     # Two-stage pipeline: use optimized two-stage function
-                    execute_pipeline(stages[0], stages[1], commands)
+                    LAST_EXIT_STATUS = execute_pipeline(stages[0], stages[1], commands)
                 else:
                     # Multi-stage pipeline (3+ commands): use general function
-                    execute_multi_stage_pipeline(stages, commands)
+                    LAST_EXIT_STATUS = execute_multi_stage_pipeline(stages, commands)
             else:
                 # Invalid pipeline syntax
-                print("Invalid pipeline syntax")
+                print("roger: syntax error near unexpected token `|`")
+                LAST_EXIT_STATUS = 2
             
             continue
 
@@ -623,13 +699,20 @@ def main():
                     os._exit(0)
                 job = register_job(pid=pid, command=display_command, process=None)
                 print(f"[{job.job_id}] {pid}")
+                LAST_EXIT_STATUS = 0
             else:
-                commands[command](args)
+                result = commands[command](args)
+                LAST_EXIT_STATUS = result if isinstance(result, int) else 0
         else:
             process = execute_external(command, args, wait=not is_background)
             if is_background and process is not None:
                 job = register_job(pid=process.pid, command=display_command, process=process)
                 print(f"[{job.job_id}] {process.pid}")
+                LAST_EXIT_STATUS = 0
+            elif process is None:
+                LAST_EXIT_STATUS = 127
+            else:
+                LAST_EXIT_STATUS = process.returncode if process.returncode is not None else 0
 
         if output_redirection_index is not None:
      
